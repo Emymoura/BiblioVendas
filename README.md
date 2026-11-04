@@ -79,4 +79,4 @@ O ecossistema do projeto é composto pelas seguintes tecnologias e ferramentas:
   <a href="mailto:emilymoura@alunos.utfpr.edu.br"><img src="https://img.shields.io/badge/Emily%20Vitorya-Gmail-EA4335?style=for-the-badge&logo=gmail&logoColor=white" alt="Email Emily"></a>
   &nbsp;&nbsp;
   <a href="mailto:andreluizteixeira@alunos.utfpr.edu.br"><img src="https://img.shields.io/badge/André%20Luiz-Gmail-EA4335?style=for-the-badge&logo=gmail&logoColor=white" alt="Email André"></a>
-</p>
+</p> 
