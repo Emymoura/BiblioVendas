@@ -29,9 +29,9 @@ O ecossistema do projeto é composto pelas seguintes tecnologias e ferramentas:
 ## 📂 Estrutura do Repositório
 📦 [BiblioVendas](./)
 
-  📂 [BackEnd](./BackEnd/)  
+  📂 [BackEnd](./BackEnd/README.md)  
  
-  📂 [FrontEnd](./FrontEnd/)  
+  📂 [FrontEnd](./FrontEnd/README.md)  
  
   📂 [Documentacao](./Documentacao/)  
  
