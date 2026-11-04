@@ -4,8 +4,8 @@ Esta pasta destina-se ao desenvolvimento do código-fonte em **Java** (Spring Bo
 
 ## 📂 Navegação
 * 🔙 **[Voltar ao Início](../)**
-* 🖥️ **[Ir para o Front-End](../FrontEnd/README.md)**
-* 📄 **[Ver Documentação](../Documentacao/README.md)**
+* 🖥️ **[Ir para o Front-End](../FrontEnd)**
+* 📄 **[Ver Documentação](../Documentacao)**
 
 ---
 
