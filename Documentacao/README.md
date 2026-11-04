@@ -21,3 +21,8 @@ Esta pasta destina-se ao armazenamento de toda a documentação, entregáveis da
 * [DiagramaAtividade.jpeg](./Diagramas/Ativididade/DiagramaAtividade.jpeg)
 * **Diagrama de Classes:** Estrutura das entidades do sistema em Java (`Usuario`, `Cliente`, `Livro`, `Pedido`, `Pagamento`, etc.).
 * [Classes](./Diagramas/Classes/)
+
+## 📂 Navegação
+* 🔙 **[Voltar ao Início](../README.md)**
+* ⚙️ **[Ir para o Back-End](../BackEnd/README.md)**
+* 📄 **[Ir para o Front-End](../FrontEnd/README.md)**
