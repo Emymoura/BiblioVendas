@@ -3,7 +3,7 @@
     src="https://capsule-render.vercel.app/api?type=blur&height=200&width=1000&color=008b8b&reversal=false&fontAlignY=20&text=Biblioteca%20Bibliovendas&fontSize=35&fontColor=f0ffff&animation=fadeIn"
     width="100%"
   />
-</p>
+</p> 
 
 > [!IMPORTANT]
 > Este repositório contém o código-fonte e a documentação do **Bibliovendas**, um sistema web completo para gerenciar e disponibilizar livros físicos e digitais (para compra ou aluguel).
