@@ -6,17 +6,22 @@
 </p>
 
 > [!IMPORTANT]
-> Este repositório contém o código-fonte e a documentação do **Bibliovendas**, um sistema web completo para gerenciar e disponibilizar livros físicos e digitais (para compra ou aluguel).
+> Este repositório contém o código-fonte e a documentação oficial do **Bibliovendas**, um sistema web desenvolvido como projeto da disciplina de Programação Orientada a Objetos 2 (UTFPR)[cite: 3].
 
 ## 📚 Sobre o Projeto
-O **Bibliovendas** centraliza as principais operações de comércio e gestão de uma biblioteca digital e física, facilitando a organização, o catálogo, o acompanhamento de pedidos e a exposição de títulos para um público amplo. O projeto faz parte da disciplina de Programação Orientada a Objetos 2 da UTFPR.
+O **Bibliovendas** é um sistema de site de biblioteca que centraliza as principais operações de disponibilizar livros físicos e digitais para compra e aluguel a um público amplo[cite: 3]. O projeto visa facilitar a organização interna, o acompanhamento de pedidos e a exposição comercial do acervo[cite: 3].
 
 ## 🛠️ Tecnologias Utilizadas
-O sistema foi desenvolvido com a seguinte stack tecnológica:
-* **Back-end:** Java (regras de negócio e API)
-* **Front-end:** React (interface web dinâmica e componentes reutilizáveis)
-* **Banco de Dados:** MySQL
-* **Ferramentas:** Visual Studio Code, Draw.io (Diagramas) e Git/GitHub.
+O ecossistema do projeto é composto pelas seguintes tecnologias e ferramentas:
+
+<div align="center">
+<img src="https://skillicons.dev/icons?i=java,react,mysql,git,github,vscode&theme=dark"/>
+</div>
+
+* **Back-end:** Java (desenvolvimento das regras de negócio)[cite: 3]
+* **Front-end:** React (interface web dinâmica e componentes reutilizáveis)[cite: 3]
+* **Banco de Dados:** MySQL[cite: 3]
+* **Ferramentas de Apoio:** Visual Studio Code, Draw.io (Diagramas) e Git/GitHub[cite: 3]
 
 ## 📂 Estrutura do Repositório
 📦 [Bibliovendas](./)
@@ -36,41 +41,20 @@ O sistema foi desenvolvido com a seguinte stack tecnológica:
 ## 🔄 Fluxo Metodológico e Funcionalidades
 <p align="center">
 
-<img src="https://img.shields.io/badge/Autenticação%20e%20Perfis-2E8B57?style=for-the-badge&logo=security&logoColor=white">
+<img src="https://img.shields.io/badge/Autenticação%20e%20Perfis-008b8b?style=for-the-badge&logo=security&logoColor=white">
 <br>
 ↓
 <br>
-<img src="https://img.shields.io/badge/Catálogo%20e%20Busca-32CD32?style=for-the-badge&logo=react&logoColor=white">
+<img src="https://img.shields.io/badge/Catálogo%20e%20Busca-20b2aa?style=for-the-badge&logo=react&logoColor=white">
 <br>
 ↓
 <br>
-<img src="https://img.shields.io/badge/Carrinho%2C%20Compra%20e%20Aluguel-FFD700?style=for-the-badge&logo=java&logoColor=black">
+<img src="https://img.shields.io/badge/Compra%20e%20Aluguel-00ced1?style=for-the-badge&logo=java&logoColor=black">
 <br>
 ↓
 <br>
-<img src="https://img.shields.io/badge/Pagamentos%20(Pix%2C%20Cartão%2C%20Boleto)-DAA520?style=for-the-badge&logo=mysql&logoColor=white">
+<img src="https://img.shields.io/badge/Pagamentos%20(Pix%2C%20Cartão%2C%20Boleto)-48d1cc?style=for-the-badge&logo=mysql&logoColor=white">
 <br>
 ↓
 <br>
-<img src="https://img.shields.io/badge/Gestão%20de%20Pedidos%20(Prestador)-2E8B57?style=for-the-badge&logo=databricks&logoColor=white">
-<br>
-
-</p>
-
-## 📊 Principais Requisitos do Sistema
-* **Perfis de Usuário:** O sistema contempla perfis de *Cliente* e *Prestador de Serviço*.
-* **Operações de Livros:** Cadastro, remoção/desativação de livros, e visualização de sinopse, gênero, autor, editora, preço e disponibilidade.
-* **Modelos de Negócio:** Suporte a vendas de livros físicos/digitais e **aluguel de livros digitais** com controle de período de acesso.
-* **Pagamento e Experiência:** Opções de pagamento por cartão, PIX e boleto, cadastro de cartões, histórico de compras/aluguéis e sistema de avaliação de experiência dos usuários.
-
-## 👥 Equipe de Desenvolvimento
-* **Ana Cecília Santana de Oliveira**
-* **Emily Vitorya de Moura**
-* **André Luiz Gonçalves da Silva Teixeira**
-
-<p align="center">
-  <img 
-    src="https://capsule-render.vercel.app/api?type=waving&height=200&color=008b8b&section=footer"
-    width="100%"
-  />
-</p>
+<img src="
