@@ -1,6 +1,6 @@
 Menu
 * ❌ [Voltar](./)
 
-* 📂 [BackEnd](./BackEnd/)  
+* 📂 [BackEnd](BackEnd)  
  
-* 📂 [Documentacao](./Documentacao/) 
+* 📂 [Documentacao](Documentacao) 
