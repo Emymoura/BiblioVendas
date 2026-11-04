@@ -24,17 +24,24 @@ O ecossistema do projeto é composto pelas seguintes tecnologias e ferramentas:
 * **Ferramentas de Apoio:** Visual Studio Code, Draw.io (Diagramas) e Git/GitHub
 
 ## 📂 Estrutura do Repositório
-📦 [Bibliovendas](./)
+📦 [BiblioVendas](./)
 
-  📂 [backend](./backend/)  
+  📂 [BackEnd](./BackEnd/)  
  
-  📂 [frontend](./frontend/)  
+  📂 [FrontEnd](./FrontEnd/)  
  
-  📂 [documentacao](./Documentacao/)  
+  📂 [Documentacao](./Documentacao/)  
  
-  ┗ 🖼️ [DiagramaClasses.png](./Documentacao/DiagramaClasses.png)  
- 
-  ┗ 🖼️ [DiagramaCasosDeUso.png](./Documentacao/DiagramaCasosDeUso.png)  
+  ┣ 📂 [Diagramas](./Documentacao/Diagramas/)  
+  ┃ ┣ 📂 [Ativididade](./Documentacao/Diagramas/Ativididade/)  
+  ┃ ┃ ┗ 🖼️ [DiagramaAtividade.jpeg](./Documentacao/Diagramas/Ativididade/DiagramaAtividade.jpeg)  
+  ┃ ┣ 📂 [CasosDeUso](./Documentacao/Diagramas/CasosDeUso/)  
+  ┃ ┃ ┗ 🖼️ [CasosdeUso.png](./Documentacao/Diagramas/CasosDeUso/CasosdeUso.png)  
+  ┃ ┗ 📂 [Classes](./Documentacao/Diagramas/Classes/)  
+  ┃   ┗ 🖼️ [DiagramaClasses(2).jpeg](./Documentacao/Diagramas/Classes/DiagramaClasses(2).jpeg)  
+  ┣ 📄 [Fase 1 - Projeto POO2.pdf](./Documentacao/Fase%201%20-%20Projeto%20POO2.pdf)  
+  ┣ 📄 [Fase 2 - BiblioVendas.pdf](./Documentacao/Fase%202%20-%20BiblioVendas.pdf)  
+  ┗ 📄 [PrincipioDIP.pdf](./Documentacao/PrincipioDIP.pdf)  
 
   📄 [README.md](./README.md)
 
