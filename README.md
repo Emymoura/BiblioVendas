@@ -11,6 +11,9 @@
 ## 📚 Sobre o Projeto
 O **Bibliovendas** é um sistema de site de biblioteca que centraliza as principais operações de disponibilizar livros físicos e digitais para compra e aluguel a um público amplo. O projeto visa facilitar a organização interna, o acompanhamento de pedidos e a exposição comercial do acervo.
 
+## 📄 Documentação Oficial
+* 📑 **[Documentação Completa e Divisão](https://docs.google.com/document/d/1pD-uOvMc5ZfvriIhDRLLELHf93_2l_5KypgDya1Jazo/edit?usp=sharing)** — Acesse o documento oficial no Google Docs com a especificação de requisitos, checklist e atribuição detalhada de tarefas para cada membro da equipe.
+
 ## 🛠️ Tecnologias Utilizadas
 O ecossistema do projeto é composto pelas seguintes tecnologias e ferramentas:
 
