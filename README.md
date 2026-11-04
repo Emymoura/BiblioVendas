@@ -73,10 +73,19 @@ O ecossistema do projeto é composto pelas seguintes tecnologias e ferramentas:
 * Emily Vitorya de Moura
 * André Luiz Gonçalves da Silva Teixeira
 
-<p align="center">
-  <a href="mailto:anacecilia@alunos.utfpr.edu.br"><img src="https://img.shields.io/badge/Ana%20Cecília-Gmail-EA4335?style=for-the-badge&logo=gmail&logoColor=white" alt="Email Ana"></a>
+<div align="center">
+  <!-- Ana Cecília -->
+  <a href="mailto:anacecilia@alunos.utfpr.edu.br">
+    <img src="https://skillicons.dev/icons?i=gmail&theme=dark" height="40"/>
+  </a>
   &nbsp;&nbsp;
-  <a href="mailto:emilymoura@alunos.utfpr.edu.br"><img src="https://img.shields.io/badge/Emily%20Vitorya-Gmail-EA4335?style=for-the-badge&logo=gmail&logoColor=white" alt="Email Emily"></a>
+  <!-- Emily -->
+  <a href="mailto:emilymoura@alunos.utfpr.edu.br">
+    <img src="https://skillicons.dev/icons?i=gmail&theme=dark" height="40"/>
+  </a>
   &nbsp;&nbsp;
-  <a href="mailto:andreluizteixeira@alunos.utfpr.edu.br"><img src="https://img.shields.io/badge/André%20Luiz-Gmail-EA4335?style=for-the-badge&logo=gmail&logoColor=white" alt="Email André"></a>
-</p> 
+  <!-- André Luiz -->
+  <a href="mailto:andreluizteixeira@alunos.utfpr.edu.br">
+    <img src="https://skillicons.dev/icons?i=gmail&theme=dark" height="40"/>
+  </a>
+</div> 
