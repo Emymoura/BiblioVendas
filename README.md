@@ -74,12 +74,18 @@ O ecossistema do projeto é composto pelas seguintes tecnologias e ferramentas:
 * André Luiz Gonçalves da Silva Teixeira
 
 <div align="center">
-<a href="mailto:anacecilia@alunos.utfpr.edu.br">
-  <img src="https://skillicons.dev/icons?i=gmail&theme=dark" height="40"/>
-  
-<a href="mailto:emilymoura@alunos.utfpr.edu.br">
-  <img src="https://skillicons.dev/icons?i=gmail&theme=dark" height="40"/>
-
-<a href="mailto:andreluizteixeira@alunos.utfpr.edu.br">
-  <img src="https://skillicons.dev/icons?i=gmail&theme=dark" height="40"/>
+  <!-- Ana Cecília -->
+  <a href="mailto:anacecilia@alunos.utfpr.edu.br">
+    <img src="https://skillicons.dev/icons?i=gmail&theme=dark" height="40"/>
+  </a>
+  &nbsp;&nbsp;
+  <!-- Emily -->
+  <a href="mailto:emilymoura@alunos.utfpr.edu.br">
+    <img src="https://skillicons.dev/icons?i=gmail&theme=dark" height="40"/>
+  </a>
+  &nbsp;&nbsp;
+  <!-- André Luiz -->
+  <a href="mailto:andreluizteixeira@alunos.utfpr.edu.br">
+    <img src="https://skillicons.dev/icons?i=gmail&theme=dark" height="40"/>
+  </a>
 </div>
