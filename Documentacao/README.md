@@ -8,8 +8,8 @@ Esta pasta destina-se ao armazenamento de toda a documentação, entregáveis da
 
 | Documento | Descrição |
 | :--- | :--- |
-| 📑 **[Fase 1 - Projeto POO2.pdf](./Fase%201%20-%20Projeto%20POO2.pdf)** | Proposta inicial do sistema, objetivos gerais/específicos e definição da stack tecnológica[cite: 3]. |
-| 📑 **[Fase 2 - BiblioVendas.pdf](./Fase%202%20-%20BiblioVendas.pdf)** | Levantamento completo de requisitos funcionais/não funcionais e diagramas (Casos de Uso, Atividades e Classes)[cite: 5, 6, 8, 12, 13, 14]. |
+| 📑 **[Fase 1 - Projeto POO2.pdf](./Fase%201%20-%20Projeto%20POO2.pdf)** | Proposta inicial do sistema, objetivos gerais/específicos e definição da stack tecnológica. |
+| 📑 **[Fase 2 - BiblioVendas.pdf](./Fase%202%20-%20BiblioVendas.pdf)** | Levantamento completo de requisitos funcionais/não funcionais e diagramas (Casos de Uso, Atividades e Classes). |
 | 📑 **[PrincipioDIP.pdf](./PrincipioDIP.pdf)** | Estudo/Atividade sobre o Princípio de Inversão de Dependência (DIP - Solid) aplicada ao projeto. |
 
 ---
