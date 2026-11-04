@@ -1,6 +1,6 @@
 <p align="center">
   <img 
-    src="https://capsule-render.vercel.app/api?type=waving&height=200&width=1000&color=2E8B57&reversal=false&fontAlignY=20&text=Biblioteca%20Bibliovendas&fontSize=35&fontColor=FFD700&animation=fadeIn"
+    src="https://capsule-render.vercel.app/api?type=waving&height=200&width=1000&color=#008b8b&reversal=false&fontAlignY=20&text=Biblioteca%20Bibliovendas&fontSize=35&fontColor=#f0ffff&animation=fadeIn"
     width="100%"
   />
 </p>
@@ -70,7 +70,7 @@ O sistema foi desenvolvido com a seguinte stack tecnológica[cite: 3]:
 
 <p align="center">
   <img 
-    src="https://capsule-render.vercel.app/api?type=waving&height=200&color=2E8B57&section=footer"
+    src="https://capsule-render.vercel.app/api?type=waving&height=200&color=#008b8b&section=footer"
     width="100%"
   />
 </p>
