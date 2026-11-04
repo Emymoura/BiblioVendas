@@ -16,8 +16,8 @@ Esta pasta destina-se ao armazenamento de toda a documentação, entregáveis da
 ## 🎨 Diagramas Mencionados na Fase 2
 
 * **Diagrama de Casos de Uso:** Mapeamento de interações para os perfis *Cliente*, *Prestador de Serviço* e *Administrador*.
-* **Caminho:** [CasosDeUso](./Documentacao/Diagramas/CasosDeUso/)
+* **Caminho:** [CasosDeUso](./Diagramas/CasosDeUso/)
 * **Diagrama de Atividades:** Fluxos de compra, aluguel e cadastro de livros.
-* **Caminho:** [DiagramaAtividade.jpeg](./Documentacao/Diagramas/Ativididade/DiagramaAtividade.jpeg)
+* **Caminho:** [DiagramaAtividade.jpeg](./Diagramas/Ativididade/DiagramaAtividade.jpeg)
 * **Diagrama de Classes:** Estrutura das entidades do sistema em Java (`Usuario`, `Cliente`, `Livro`, `Pedido`, `Pagamento`, etc.).
-* **Caminho:** [Classes](./Documentacao/Diagramas/Classes/)
+* **Caminho:** [Classes](./Diagramas/Classes/)
