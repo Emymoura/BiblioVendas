@@ -23,6 +23,6 @@ Esta pasta destina-se ao armazenamento de toda a documentação, entregáveis da
 * [Classes](./Diagramas/Classes/)
 
 ## 📂 Navegação
-* 🔙 **[Voltar ao Início](../README.md)**
+* 🔙 **[Voltar ao Início](../)**
 * ⚙️ **[Ir para o Back-End](../BackEnd)**
-* 📄 **[Ir para o Front-End](../FrontEnd/README.md)**
+* 📄 **[Ir para o Front-End](../FrontEnd)**
