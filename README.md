@@ -57,4 +57,25 @@ O ecossistema do projeto é composto pelas seguintes tecnologias e ferramentas:
 <br>
 ↓
 <br>
-<img src="
+<img src="https://img.shields.io/badge/Gestão%20de%20Pedidos-008b8b?style=for-the-badge&logo=databricks&logoColor=white">
+<br>
+
+</p>
+
+## 📊 Principais Objetivos e Requisitos
+* **Perfis de Usuário:** Suporte a perfis de *Cliente* e *Prestador de Serviço*[cite: 3].
+* **Gestão de Livros:** Cadastro, visualização de sinopse/detalhes e desativação/remoção de títulos do catálogo[cite: 9, 10].
+* **Modelos de Negócio:** Venda de livros físicos e digitais, além de aluguel de livros digitais com controle de período de acesso[cite: 3, 9, 10].
+* **Experiência e Pagamento:** Opções de pagamento via cartão, PIX e boleto[cite: 9], cadastro de cartões[cite: 9], histórico de compras/aluguéis[cite: 9] e avaliação de experiência dos usuários[cite: 9].
+
+## 👥 Equipe de Desenvolvimento
+* Ana Cecília Santana de Oliveira[cite: 3]
+* Emily Vitorya de Moura[cite: 3]
+* André Luiz Gonçalves da Silva Teixeira[cite: 3]
+
+<p align="center">
+  <img 
+    src="https://capsule-render.vercel.app/api?type=blur&height=180&color=008b8b&section=footer"
+    width="100%"
+  />
+</p>
