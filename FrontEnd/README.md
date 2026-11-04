@@ -4,5 +4,5 @@ Esta pasta destina-se ao desenvolvimento da interface web do sistema utilizando 
 
 ## 📂 Navegação
 * 🔙 **[Voltar ao Início](../)**
-* ⚙️ **[Ir para o Back-End](./BackEnd/)**
+* ⚙️ **[Ir para o Back-End](../BackEnd/README.md)**
 * 📄 **[Ver Documentação](../Documentacao/README.md)**
