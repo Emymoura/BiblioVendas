@@ -24,5 +24,5 @@ Esta pasta destina-se ao armazenamento de toda a documentação, entregáveis da
 
 ## 📂 Navegação
 * 🔙 **[Voltar ao Início](../README.md)**
-* ⚙️ **[Ir para o Back-End](../BackEnd/)**
+* ⚙️ **[Ir para o Back-End](../BackEnd)**
 * 📄 **[Ir para o Front-End](../FrontEnd/README.md)**
