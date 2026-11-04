@@ -1,6 +1,6 @@
 <p align="center">
   <img 
-    src="https://capsule-render.vercel.app/api?type=waving&height=200&width=1000&color=#008b8b&reversal=false&fontAlignY=20&text=Biblioteca%20Bibliovendas&fontSize=35&fontColor=#f0ffff&animation=fadeIn"
+    src="https://capsule-render.vercel.app/api?type=waving&height=200&width=1000&color=#008b8b&reversal=false&fontAlignY=20&text=Biblioteca%20Bibliovendas&fontSize=35&fontColor=f0ffff&animation=fadeIn"
     width="100%"
   />
 </p>
