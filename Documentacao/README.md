@@ -1,1 +1,21 @@
+# 📄 Documentação do Projeto - Bibliovendas
 
+Esta pasta destina-se ao armazenamento de toda a documentação, entregáveis das fases do projeto e relatórios das atividades desenvolvidas na disciplina de **Programação Orientada a Objetos 2 (UTFPR)**.
+
+---
+
+## 📚 Ficheiros Disponíveis
+
+| Documento | Descrição |
+| :--- | :--- |
+| 📑 **[Fase 1 - Projeto POO2.pdf](./Fase%201%20-%20Projeto%20POO2.pdf)** | Proposta inicial do sistema, objetivos gerais/específicos e definição da stack tecnológica[cite: 3]. |
+| 📑 **[Fase 2 - BiblioVendas.pdf](./Fase%202%20-%20BiblioVendas.pdf)** | Levantamento completo de requisitos funcionais/não funcionais e diagramas (Casos de Uso, Atividades e Classes)[cite: 5, 6, 8, 12, 13, 14]. |
+| 📑 **[PrincipioDIP.pdf](./PrincipioDIP.pdf)** | Estudo/Atividade sobre o Princípio de Inversão de Dependência (DIP - Solid) aplicada ao projeto. |
+
+---
+
+## 🎨 Diagramas Mencionados na Fase 2
+
+* **Diagrama de Casos de Uso:** Mapeamento de interações para os perfis *Cliente*, *Prestador de Serviço* e *Administrador*.
+* **Diagrama de Atividades:** Fluxos de compra, aluguel e cadastro de livros.
+* **Diagrama de Classes:** Estrutura das entidades do sistema em Java (`Usuario`, `Cliente`, `Livro`, `Pedido`, `Pagamento`, etc.).
