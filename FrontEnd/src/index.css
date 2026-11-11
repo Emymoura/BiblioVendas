@@ -1,0 +1,282 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #f5f7fb;
+  background: #081525;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #071521, #11253e 45%, #0b1e25);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #7fece8;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: clamp(2.1rem, 3vw, 3rem);
+}
+
+nav {
+  display: flex;
+  gap: 20px;
+}
+
+nav a {
+  color: #d8f0ff;
+  text-decoration: none;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.5fr 0.8fr;
+  gap: 24px;
+  align-items: center;
+  padding: 36px;
+  background: rgba(18, 34, 51, 0.9);
+  border: 1px solid rgba(127, 236, 232, 0.25);
+  border-radius: 20px;
+}
+
+.badge {
+  display: inline-flex;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(127, 236, 232, 0.14);
+  color: #7fece8;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+}
+
+.hero h2 {
+  margin: 0 0 12px;
+  font-size: clamp(2rem, 2.8vw, 3rem);
+}
+
+.hero p {
+  margin: 0;
+  color: #d0e3f8;
+}
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(10, 18, 30, 0.9);
+  padding: 24px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.login-card h3 {
+  margin: 0 0 8px;
+}
+
+.login-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.account-email {
+  margin: 0 0 8px;
+  color: #cfe1f7;
+}
+
+.login-card input {
+  border-radius: 10px;
+  border: 1px solid #2d4d69;
+  background: #0f2032;
+  color: white;
+  padding: 12px 14px;
+}
+
+.login-card button, .book-card button {
+  border: none;
+  background: linear-gradient(135deg, #4dd7ce, #3e8db7);
+  color: #032230;
+  font-weight: 700;
+  padding: 12px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.login-card .text-button {
+  padding: 4px;
+  background: transparent;
+  color: #7fece8;
+}
+
+.notice {
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.notice-success {
+  border: 1px solid rgba(141, 255, 200, 0.3);
+  color: #a7ffd1;
+  background: rgba(36, 112, 82, 0.2);
+}
+
+.notice-error {
+  border: 1px solid rgba(255, 132, 132, 0.3);
+  color: #ffb6b6;
+  background: rgba(125, 35, 44, 0.2);
+}
+
+.catalog-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.section-header input {
+  width: min(100%, 420px);
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(14, 28, 43, 0.9);
+  color: white;
+}
+
+.payment-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #d0e3f8;
+}
+
+.payment-choice select {
+  border: 1px solid #2d4d69;
+  border-radius: 10px;
+  background: #0f2032;
+  color: white;
+  padding: 9px 12px;
+}
+
+.catalog-message {
+  color: #d0e3f8;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.book-card {
+  background: rgba(13, 25, 38, 0.9);
+  border-radius: 18px;
+  border: 1px solid rgba(127, 236, 232, 0.15);
+  padding: 18px;
+}
+
+.book-tag {
+  display: inline-block;
+  background: rgba(139, 255, 182, 0.12);
+  color: #8dffc8;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  margin-bottom: 12px;
+}
+
+.book-tag-unavailable {
+  background: rgba(255, 132, 132, 0.12);
+  color: #ffb6b6;
+}
+
+.book-card h4 {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+}
+
+.book-card p {
+  margin: 0 0 12px;
+  color: #cfe1f7;
+}
+
+.book-card ul {
+  margin: 0 0 18px;
+  padding-left: 18px;
+  color: #dfeaf9;
+}
+
+.book-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.book-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.book-card .secondary-button {
+  background: transparent;
+  border: 1px solid #4dd7ce;
+  color: #7fece8;
+}
+
+@media (max-width: 720px) {
+  .topbar,
+  .section-header,
+  .hero {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  nav {
+    flex-wrap: wrap;
+  }
+}
