@@ -5,9 +5,11 @@ import com.bibliovendas.model.Boleto;
 import com.bibliovendas.model.Cartao;
 import com.bibliovendas.model.Cliente;
 import com.bibliovendas.model.Livro;
+import com.bibliovendas.model.ItemPedido;
 import com.bibliovendas.model.Pagamento;
 import com.bibliovendas.model.Pedido;
 import com.bibliovendas.model.Pix;
+import com.bibliovendas.model.Pedido;
 import com.bibliovendas.model.PrestadorServico;
 import com.bibliovendas.model.SenhaUtil;
 import com.bibliovendas.model.StatusPedido;
@@ -21,8 +23,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -206,10 +208,22 @@ public class MySqlBibliotecaRepository {
 
     public Pedido registrarPedido(Cliente cliente, Livro livro, int quantidade, Pagamento pagamento,
                                  TipoPedido tipoPedido, StatusPedido status) {
-        String inserirPedido = "INSERT INTO pedidos (cliente_id, status, tipo_pedido, pagamento_tipo, pagamento_valor) "
-                + "VALUES (?, ?, ?, ?, ?)";
-        String inserirItem = "INSERT INTO itens_pedido (pedido_id, livro_id, quantidade, preco_unitario) "
-                + "VALUES (?, ?, ?, ?)";
+        return registrarPedido(cliente, Collections.singletonList(new ItemPedido(livro, quantidade)),
+                pagamento, tipoPedido, status);
+    }
+
+    public Pedido registrarPedido(Cliente cliente, List<ItemPedido> itens, Pagamento pagamento,
+                                 TipoPedido tipoPedido, StatusPedido status) {
+        if (itens == null || itens.isEmpty()) {
+            throw new IllegalArgumentException("O pedido precisa ter ao menos um livro.");
+        }
+        if (tipoPedido == TipoPedido.ALUGUEL && itens.size() != 1) {
+            throw new IllegalArgumentException("Cada aluguel deve conter exatamente um livro.");
+        }
+        String inserirPedido = "INSERT INTO pedidos (cliente_id, status, tipo_pedido, pagamento_tipo, "
+                + "pagamento_valor, data_fim_aluguel) VALUES (?, ?, ?, ?, ?, ?)";
+        String inserirItem = "INSERT INTO itens_pedido "
+                + "(pedido_id, livro_id, nome_livro, quantidade, preco_unitario) VALUES (?, ?, ?, ?, ?)";
         String reduzirEstoque = "UPDATE livros SET quantidade = quantidade - ?, "
                 + "disponivel = quantidade > 0 WHERE id = ? AND disponivel = TRUE AND quantidade >= ?";
 
@@ -218,13 +232,18 @@ public class MySqlBibliotecaRepository {
             try {
                 if (tipoPedido == TipoPedido.COMPRA) {
                     try (PreparedStatement estoque = connection.prepareStatement(reduzirEstoque)) {
-                        estoque.setInt(1, quantidade);
-                        estoque.setLong(2, livro.getId());
-                        estoque.setInt(3, quantidade);
-                        if (estoque.executeUpdate() == 0) {
-                            throw new IllegalStateException("Livro indisponível para compra.");
+                        for (ItemPedido item : itens) {
+                            estoque.setInt(1, item.getQuantidade());
+                            estoque.setLong(2, item.getLivro().getId());
+                            estoque.setInt(3, item.getQuantidade());
+                            if (estoque.executeUpdate() == 0) {
+                                throw new IllegalStateException(
+                                        "Estoque insuficiente para \"" + item.getNomeLivro() + "\".");
+                            }
                         }
                     }
+                } else {
+                    validarAluguelNoBanco(connection, cliente.getId(), itens.get(0).getLivro().getId());
                 }
 
                 long pedidoId;
@@ -235,6 +254,12 @@ public class MySqlBibliotecaRepository {
                     pedido.setString(3, tipoPedido.name());
                     pedido.setString(4, pagamento.getTipo());
                     pedido.setBigDecimal(5, pagamento.getValor());
+                    if (tipoPedido == TipoPedido.ALUGUEL) {
+                        pedido.setDate(6, java.sql.Date.valueOf(
+                                LocalDate.now().plusDays(Pedido.DURACAO_ALUGUEL_DIAS)));
+                    } else {
+                        pedido.setNull(6, java.sql.Types.DATE);
+                    }
                     pedido.executeUpdate();
                     try (ResultSet keys = pedido.getGeneratedKeys()) {
                         if (!keys.next()) {
@@ -245,23 +270,32 @@ public class MySqlBibliotecaRepository {
                 }
 
                 try (PreparedStatement item = connection.prepareStatement(inserirItem)) {
-                    item.setLong(1, pedidoId);
-                    item.setLong(2, livro.getId());
-                    item.setInt(3, quantidade);
-                    item.setBigDecimal(4, livro.getPreco());
-                    item.executeUpdate();
+                    for (ItemPedido livroPedido : itens) {
+                        item.setLong(1, pedidoId);
+                        item.setLong(2, livroPedido.getLivro().getId());
+                        item.setString(3, livroPedido.getNomeLivro());
+                        item.setInt(4, livroPedido.getQuantidade());
+                        item.setBigDecimal(5, livroPedido.getPrecoUnitario());
+                        item.addBatch();
+                    }
+                    item.executeBatch();
                 }
                 connection.commit();
 
                 if (tipoPedido == TipoPedido.COMPRA) {
-                    Livro atualizado = buscarLivro(livro.getId())
-                            .orElseThrow(() -> new IllegalStateException("Livro não encontrado após a compra."));
-                    livro.setQuantidade(atualizado.getQuantidade());
-                    livro.setDisponivel(atualizado.isDisponivel());
+                    for (ItemPedido item : itens) {
+                        Livro atualizado = buscarLivro(item.getLivro().getId())
+                                .orElseThrow(() -> new IllegalStateException("Livro não encontrado após a compra."));
+                        item.getLivro().setQuantidade(atualizado.getQuantidade());
+                        item.getLivro().setDisponivel(atualizado.isDisponivel());
+                    }
                 }
 
                 Pedido resultado = new Pedido(pedidoId, cliente, tipoPedido, pagamento);
-                resultado.adicionarItem(livro, quantidade);
+                for (ItemPedido item : itens) {
+                    resultado.adicionarItem(item.getLivro(), item.getQuantidade(),
+                            item.getNomeLivro(), item.getPrecoUnitario());
+                }
                 resultado.setStatus(status);
                 cliente.adicionarPedido(resultado);
                 return resultado;
@@ -282,26 +316,44 @@ public class MySqlBibliotecaRepository {
     }
 
     public List<Pedido> consultarHistoricoCliente(Long clienteId) {
+        return consultarHistoricoCliente(clienteId, 1, Integer.MAX_VALUE, null);
+    }
+
+    public List<Pedido> consultarHistoricoCliente(Long clienteId, int pagina, int limite, TipoPedido tipo) {
+        if (pagina < 1 || limite < 1) {
+            throw new IllegalArgumentException("A página e o limite devem ser positivos.");
+        }
         Cliente cliente = buscarCliente(clienteId);
         if (cliente == null) {
             throw new IllegalArgumentException("Cliente não encontrado.");
         }
 
         List<Pedido> pedidos = new ArrayList<>();
-        String sql = "SELECT id, data_criacao, status, tipo_pedido, pagamento_tipo, pagamento_valor "
-                + "FROM pedidos WHERE cliente_id = ? ORDER BY data_criacao DESC, id DESC";
+        String sql = "SELECT id, data_criacao, data_fim_aluguel, status, tipo_pedido, "
+                + "pagamento_tipo, pagamento_valor FROM pedidos WHERE cliente_id = ?"
+                + (tipo == null ? "" : " AND tipo_pedido = ?")
+                + " ORDER BY data_criacao DESC, id DESC LIMIT ? OFFSET ?";
         try (Connection connection = database.conectar();
              PreparedStatement statement = connection.prepareStatement(sql)) {
+            encerrarAlugueisExpirados(connection);
             statement.setLong(1, clienteId);
+            int parametro = 2;
+            if (tipo != null) {
+                statement.setString(parametro++, tipo.name());
+            }
+            statement.setInt(parametro++, limite);
+            statement.setLong(parametro, (long) (pagina - 1) * limite);
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
                     long pedidoId = result.getLong("id");
-                    TipoPedido tipo = TipoPedido.valueOf(result.getString("tipo_pedido"));
+                    TipoPedido tipoPedido = TipoPedido.valueOf(result.getString("tipo_pedido"));
                     StatusPedido status = StatusPedido.valueOf(result.getString("status"));
                     BigDecimal valor = result.getBigDecimal("pagamento_valor");
                     Pagamento pagamento = criarPagamento(result.getString("pagamento_tipo"), valor);
                     LocalDate data = result.getTimestamp("data_criacao").toLocalDateTime().toLocalDate();
-                    Pedido pedido = new Pedido(pedidoId, cliente, tipo, pagamento, data, status);
+                    java.sql.Date dataFim = result.getDate("data_fim_aluguel");
+                    Pedido pedido = new Pedido(pedidoId, cliente, tipoPedido, pagamento, data, status,
+                            dataFim == null ? null : dataFim.toLocalDate());
                     carregarItens(connection, pedido);
                     pedidos.add(pedido);
                     cliente.adicionarPedido(pedido);
@@ -310,6 +362,101 @@ public class MySqlBibliotecaRepository {
             return pedidos;
         } catch (SQLException ex) {
             throw erro("Não foi possível carregar o histórico de pedidos.", ex);
+        }
+    }
+
+    public int contarPedidosCliente(Long clienteId, TipoPedido tipo) {
+        if (buscarCliente(clienteId) == null) {
+            throw new IllegalArgumentException("Cliente não encontrado.");
+        }
+        String sql = "SELECT COUNT(*) FROM pedidos WHERE cliente_id = ?"
+                + (tipo == null ? "" : " AND tipo_pedido = ?");
+        try (Connection connection = database.conectar();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            encerrarAlugueisExpirados(connection);
+            statement.setLong(1, clienteId);
+            if (tipo != null) {
+                statement.setString(2, tipo.name());
+            }
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? result.getInt(1) : 0;
+            }
+        } catch (SQLException ex) {
+            throw erro("Não foi possível contar os pedidos do cliente.", ex);
+        }
+    }
+
+    public void reembolsarPedido(Long clienteId, Long pedidoId) {
+        try (Connection connection = database.conectar()) {
+            connection.setAutoCommit(false);
+            try {
+                TipoPedido tipo;
+                StatusPedido status;
+                boolean dentroPrazo;
+                String consultar = "SELECT tipo_pedido, status, "
+                        + "(data_criacao >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 7 DAY)) AS dentro_prazo "
+                        + "FROM pedidos WHERE id = ? AND cliente_id = ? FOR UPDATE";
+                try (PreparedStatement statement = connection.prepareStatement(consultar)) {
+                    statement.setLong(1, pedidoId);
+                    statement.setLong(2, clienteId);
+                    try (ResultSet result = statement.executeQuery()) {
+                        if (!result.next()) {
+                            throw new IllegalArgumentException("Pedido não encontrado.");
+                        }
+                        tipo = TipoPedido.valueOf(result.getString("tipo_pedido"));
+                        status = StatusPedido.valueOf(result.getString("status"));
+                        dentroPrazo = result.getBoolean("dentro_prazo");
+                    }
+                }
+                if (tipo != TipoPedido.COMPRA) {
+                    throw new IllegalStateException("Somente compras podem ser reembolsadas.");
+                }
+                if (status != StatusPedido.CONFIRMADO) {
+                    throw new IllegalStateException("Este pedido não está disponível para reembolso.");
+                }
+                if (!dentroPrazo) {
+                    throw new IllegalStateException("O prazo de reembolso de 7 dias terminou.");
+                }
+
+                List<long[]> itens = new ArrayList<>();
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "SELECT livro_id, quantidade FROM itens_pedido WHERE pedido_id = ?")) {
+                    statement.setLong(1, pedidoId);
+                    try (ResultSet result = statement.executeQuery()) {
+                        while (result.next()) {
+                            itens.add(new long[]{result.getLong("livro_id"), result.getLong("quantidade")});
+                        }
+                    }
+                }
+                if (itens.isEmpty()) {
+                    throw new IllegalStateException("O pedido não possui itens para reembolsar.");
+                }
+
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "UPDATE pedidos SET status = 'REEMBOLSADO' WHERE id = ? AND status = 'CONFIRMADO'")) {
+                    statement.setLong(1, pedidoId);
+                    if (statement.executeUpdate() != 1) {
+                        throw new IllegalStateException("Este pedido já foi atualizado.");
+                    }
+                }
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "UPDATE livros SET quantidade = quantidade + ?, disponivel = TRUE WHERE id = ?")) {
+                    for (long[] item : itens) {
+                        statement.setLong(1, item[1]);
+                        statement.setLong(2, item[0]);
+                        statement.addBatch();
+                    }
+                    statement.executeBatch();
+                }
+                connection.commit();
+            } catch (SQLException | RuntimeException ex) {
+                connection.rollback();
+                throw ex;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException ex) {
+            throw erro("Não foi possível processar o reembolso.", ex);
         }
     }
 
@@ -422,16 +569,57 @@ public class MySqlBibliotecaRepository {
     }
 
     private void carregarItens(Connection connection, Pedido pedido) throws SQLException {
-        String sql = "SELECT livro_id, quantidade FROM itens_pedido WHERE pedido_id = ?";
+        String sql = "SELECT livro_id, nome_livro, quantidade, preco_unitario "
+                + "FROM itens_pedido WHERE pedido_id = ?";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, pedido.getId());
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
                     Livro livro = buscarLivro(result.getLong("livro_id"))
                             .orElseThrow(() -> new IllegalStateException("Livro do pedido não encontrado."));
-                    pedido.adicionarItem(livro, result.getInt("quantidade"));
+                    pedido.adicionarItem(livro, result.getInt("quantidade"),
+                            result.getString("nome_livro"), result.getBigDecimal("preco_unitario"));
                 }
             }
+        }
+    }
+
+    private void validarAluguelNoBanco(Connection connection, Long clienteId, Long livroId) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT digital, disponivel FROM livros WHERE id = ? FOR UPDATE")) {
+            statement.setLong(1, livroId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) {
+                    throw new IllegalArgumentException("Livro não encontrado.");
+                }
+                if (!result.getBoolean("digital")) {
+                    throw new IllegalStateException("Aluguel somente para livros digitais.");
+                }
+                if (!result.getBoolean("disponivel")) {
+                    throw new IllegalStateException("Livro indisponível para aluguel.");
+                }
+            }
+        }
+        encerrarAlugueisExpirados(connection);
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT COUNT(*) FROM pedidos p JOIN itens_pedido i ON i.pedido_id = p.id "
+                        + "WHERE p.cliente_id = ? AND i.livro_id = ? AND p.tipo_pedido = 'ALUGUEL' "
+                        + "AND p.status = 'ATIVO' AND p.data_fim_aluguel > CURRENT_DATE")) {
+            statement.setLong(1, clienteId);
+            statement.setLong(2, livroId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (result.next() && result.getLong(1) > 0) {
+                    throw new IllegalStateException("Você já possui um aluguel ativo deste livro.");
+                }
+            }
+        }
+    }
+
+    private void encerrarAlugueisExpirados(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate("UPDATE pedidos SET status = 'EXPIRADO' "
+                    + "WHERE tipo_pedido = 'ALUGUEL' AND status = 'ATIVO' "
+                    + "AND data_fim_aluguel <= CURRENT_DATE");
         }
     }
 

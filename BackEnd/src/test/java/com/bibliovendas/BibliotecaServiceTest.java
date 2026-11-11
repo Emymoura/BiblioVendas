@@ -19,10 +19,10 @@ class BibliotecaServiceTest {
     void deveCadastrarClienteELogin() {
         BibliotecaService service = new BibliotecaService();
 
-        Cliente cliente = service.cadastrarCliente("Ana", "ana@email.com", "1234", "Rua A, 123");
+        Cliente cliente = service.cadastrarCliente("Ana", "ana@email.com", "Senha123!", "Rua A, 123");
 
         assertNotNull(cliente);
-        assertEquals("Ana", service.loginCliente("ana@email.com", "1234")
+        assertEquals("Ana", service.loginCliente("ana@email.com", "Senha123!")
                 .orElseThrow(() -> new AssertionError("Cliente não encontrado."))
                 .getNome());
     }
@@ -30,7 +30,7 @@ class BibliotecaServiceTest {
     @Test
     void deveCompraAtualizarEstoque() {
         BibliotecaService service = new BibliotecaService();
-        Cliente cliente = service.cadastrarCliente("Joao", "joao@email.com", "1234", "Rua B");
+        Cliente cliente = service.cadastrarCliente("Joao", "joao@email.com", "Senha123!", "Rua B");
         Livro livro = service.cadastrarLivro(
                 "Java 17",
                 "Livro de estudo",
@@ -56,7 +56,7 @@ class BibliotecaServiceTest {
     @Test
     void deveAlugarLivroDigitalEPermitirAcesso() {
         BibliotecaService service = new BibliotecaService();
-        Cliente cliente = service.cadastrarCliente("Maria", "maria@email.com", "1234", "Rua C");
+        Cliente cliente = service.cadastrarCliente("Maria", "maria@email.com", "Senha123!", "Rua C");
         Livro livro = service.cadastrarLivro(
                 "Livro Digital",
                 "Leitura online",
@@ -75,13 +75,17 @@ class BibliotecaServiceTest {
         Pedido pedido = service.efetuarAluguel(cliente, livro.getId(), 1, new Cartao(new BigDecimal("19.90"), "4321", "Maria"));
 
         assertEquals(StatusPedido.ATIVO, pedido.getStatus());
+        assertEquals(java.time.LocalDate.now().plusDays(14), pedido.getDataFimAluguel());
         assertTrue(service.acessarLivroDigital(cliente.getId(), livro.getId()));
+        assertThrows(IllegalStateException.class,
+                () -> service.efetuarAluguel(cliente, livro.getId(), 1,
+                        new Cartao(new BigDecimal("19.90"), "4321", "Maria")));
     }
 
     @Test
     void deveDesativarLivroComoPrestador() {
         BibliotecaService service = new BibliotecaService();
-        PrestadorServico prestador = service.cadastrarPrestador("Lira", "lira@email.com", "1234", "Rua D");
+        PrestadorServico prestador = service.cadastrarPrestador("Lira", "lira@email.com", "Senha123!", "Rua D");
         Livro livro = service.cadastrarLivro(
                 "Livro para desativar",
                 "História",
@@ -105,7 +109,7 @@ class BibliotecaServiceTest {
     @Test
     void deveRegistrarAvaliacaoEConsultarHistorico() {
         BibliotecaService service = new BibliotecaService();
-        Cliente cliente = service.cadastrarCliente("Pedro", "pedro@email.com", "1234", "Rua E");
+        Cliente cliente = service.cadastrarCliente("Pedro", "pedro@email.com", "Senha123!", "Rua E");
         Livro livro = service.cadastrarLivro(
                 "Livro Avaliado",
                 "Obra de avaliação",

@@ -39,14 +39,20 @@ A API fica em `http://127.0.0.1:8080/api` e permanece ativa até encerrar o proc
 
 - `GET /api/health` — estado da API
 - `GET /api/livros?busca=termo` — catálogo e busca
-- `POST /api/clientes` — cadastro (`nome`, `email`, `senha`, `endereco`); retorna token de sessão
+- `GET /api/livros/{id}` — detalhes de um livro
+- `POST /api/clientes` — cadastro (`nome`, `email`, `senha`, `endereco`); exige 8 caracteres, maiúscula, número e caractere especial; retorna token
 - `POST /api/auth/login` — login (`email`, `senha`); retorna token de sessão
-- `GET /api/pedidos` — histórico do cliente autenticado
-- `POST /api/pedidos` — compra ou aluguel (`livroId`, `quantidade`, `tipo`, `pagamento`)
+- `GET /api/auth/session` — valida a sessão autenticada
+- `GET /api/pedidos` — histórico completo do cliente autenticado
+- `GET /api/pedidos?pagina=1&limite=5&tipo=ALUGUEL` — página de pedidos; `tipo` também aceita `COMPRA`
+- `POST /api/pedidos` — compra com vários itens (`itens: [{livroId, quantidade}]`, `tipo: "COMPRA"`, `pagamento`) ou aluguel de um livro (`livroId`, `quantidade: 1`, `tipo: "ALUGUEL"`, `pagamento`); o formato antigo de item único continua aceito
+- `POST /api/pedidos/{id}/reembolso` — reembolso simulado de uma compra em até 7 dias; compras fora do prazo e aluguéis não podem ser reembolsados
 - `GET /api/avaliacoes?livroId=1` — avaliações de um livro ou do catálogo inteiro
 - `POST /api/avaliacoes` — avaliação autenticada (`livroId`, `nota`, `comentario`); exige compra ou aluguel
 
 Pedidos e avaliações exigem o cabeçalho `Authorization: Bearer <token>`. Sessões ficam em memória e expiram ao reiniciar a API. As avaliações iniciais são identificadas como demonstrativas. Os pagamentos são simulados; nenhuma cobrança é enviada a uma operadora. O Vite encaminha `/api` ao backend durante o desenvolvimento.
+
+Aluguéis são exclusivos por cliente e livro enquanto ativos, duram 14 dias e exibem a data de vencimento no histórico e na página "Meus livros alugados". O backend migra automaticamente os pedidos antigos para salvar os nomes históricos dos livros e as datas de vencimento.
 
 ## Estrutura
 

@@ -6,7 +6,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.stream.Collectors;
@@ -52,12 +54,35 @@ public class MySqlDatabase {
                         statement.execute(comando);
                     }
                 }
+                garantirColuna(connection, "pedidos", "data_fim_aluguel", "DATE NULL");
+                garantirColuna(connection, "itens_pedido", "nome_livro", "VARCHAR(200) NULL");
+                statement.executeUpdate("UPDATE itens_pedido i JOIN livros l ON l.id = i.livro_id "
+                        + "SET i.nome_livro = l.nome WHERE i.nome_livro IS NULL OR i.nome_livro = ''");
+                statement.executeUpdate("UPDATE pedidos SET data_fim_aluguel = "
+                        + "DATE_ADD(DATE(data_criacao), INTERVAL 14 DAY) "
+                        + "WHERE tipo_pedido = 'ALUGUEL' AND data_fim_aluguel IS NULL");
+                statement.executeUpdate("UPDATE pedidos SET status = 'EXPIRADO' "
+                        + "WHERE tipo_pedido = 'ALUGUEL' AND status = 'ATIVO' "
+                        + "AND data_fim_aluguel <= CURRENT_DATE");
             }
         } catch (SQLException | IOException ex) {
             throw new PersistenceException(
                     "Não foi possível inicializar o banco MySQL. Verifique a conexão e execute BackEnd/database/schema.sql.",
                     ex
             );
+        }
+    }
+
+    private void garantirColuna(Connection connection, String tabela, String coluna, String definicao)
+            throws SQLException {
+        DatabaseMetaData metadata = connection.getMetaData();
+        try (ResultSet colunas = metadata.getColumns(connection.getCatalog(), null, tabela, coluna)) {
+            if (colunas.next()) {
+                return;
+            }
+        }
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("ALTER TABLE " + tabela + " ADD COLUMN " + coluna + " " + definicao);
         }
     }
 
