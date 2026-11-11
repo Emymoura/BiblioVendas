@@ -1,6 +1,7 @@
 package com.bibliovendas.api;
 
 import com.bibliovendas.model.Boleto;
+import com.bibliovendas.model.Avaliacao;
 import com.bibliovendas.model.Cartao;
 import com.bibliovendas.model.Cliente;
 import com.bibliovendas.model.Livro;
@@ -90,6 +91,10 @@ public class BibliotecaApiServer implements AutoCloseable {
                 criarPedido(exchange);
             } else if ("GET".equals(method) && "/api/pedidos".equals(path)) {
                 listarPedidos(exchange);
+            } else if ("GET".equals(method) && "/api/avaliacoes".equals(path)) {
+                listarAvaliacoes(exchange);
+            } else if ("POST".equals(method) && "/api/avaliacoes".equals(path)) {
+                criarAvaliacao(exchange);
             } else {
                 responder(exchange, 404, json.createObjectNode().put("erro", "Rota não encontrada."));
             }
@@ -186,6 +191,43 @@ public class BibliotecaApiServer implements AutoCloseable {
         responder(exchange, 200, resposta);
     }
 
+    private void listarAvaliacoes(HttpExchange exchange) throws IOException {
+        String livroIdQuery = parametroConsulta(exchange, "livroId");
+        Long livroId = null;
+        if (livroIdQuery != null && !livroIdQuery.trim().isEmpty()) {
+            try {
+                livroId = Long.valueOf(livroIdQuery);
+            } catch (NumberFormatException ex) {
+                throw new IllegalArgumentException("livroId deve ser um número inteiro.");
+            }
+        }
+
+        ArrayNode resposta = json.createArrayNode();
+        for (Avaliacao avaliacao : service.buscarAvaliacoesLivro(livroId)) {
+            resposta.add(avaliacaoJson(avaliacao));
+        }
+        responder(exchange, 200, resposta);
+    }
+
+    private void criarAvaliacao(HttpExchange exchange) throws IOException {
+        Cliente cliente = clienteAutenticado(exchange);
+        JsonNode corpo = lerCorpo(exchange);
+        long livroId = numeroObrigatorio(corpo, "livroId");
+        int nota = inteiroObrigatorio(corpo, "nota");
+        if (nota < 1 || nota > 5) {
+            throw new IllegalArgumentException("A nota deve estar entre 1 e 5.");
+        }
+        String comentario = textoOpcional(corpo, "comentario");
+        service.avaliarExperiencia(cliente.getId(), livroId, nota, comentario);
+        responder(exchange, 201, json.createObjectNode()
+                .put("livroId", livroId)
+                .put("cliente", cliente.getNome())
+                .put("nota", nota)
+                .put("comentario", comentario)
+                .put("data", java.time.LocalDate.now().toString())
+                .put("demonstracao", false));
+    }
+
     private Pagamento criarPagamento(String metodo, Livro livro, int quantidade, Cliente cliente) {
         java.math.BigDecimal total = livro.getPreco().multiply(java.math.BigDecimal.valueOf(quantidade));
         if ("PIX".equals(metodo)) {
@@ -258,6 +300,16 @@ public class BibliotecaApiServer implements AutoCloseable {
         return resposta;
     }
 
+    private ObjectNode avaliacaoJson(Avaliacao avaliacao) {
+        return json.createObjectNode()
+                .put("livroId", avaliacao.getLivroId())
+                .put("nota", avaliacao.getNota())
+                .put("comentario", avaliacao.getComentario())
+                .put("cliente", avaliacao.getNomeCliente())
+                .put("data", avaliacao.getData().toString())
+                .put("demonstracao", avaliacao.isDemonstracao());
+    }
+
     private JsonNode lerCorpo(HttpExchange exchange) throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         byte[] buffer = new byte[4096];
@@ -283,6 +335,17 @@ public class BibliotecaApiServer implements AutoCloseable {
         JsonNode valor = corpo.get(campo);
         if (valor == null || !valor.isTextual() || valor.asText().trim().isEmpty()) {
             throw new IllegalArgumentException("O campo '" + campo + "' é obrigatório.");
+        }
+        return valor.asText().trim();
+    }
+
+    private String textoOpcional(JsonNode corpo, String campo) {
+        JsonNode valor = corpo.get(campo);
+        if (valor == null || valor.isNull()) {
+            return "";
+        }
+        if (!valor.isTextual()) {
+            throw new IllegalArgumentException("O campo '" + campo + "' deve ser um texto.");
         }
         return valor.asText().trim();
     }

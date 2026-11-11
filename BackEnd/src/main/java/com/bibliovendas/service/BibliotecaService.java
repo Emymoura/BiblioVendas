@@ -233,6 +233,9 @@ public class BibliotecaService {
             if (repositorio.buscarCliente(clienteId) == null) {
                 throw new IllegalArgumentException("Cliente não encontrado.");
             }
+            if (!repositorio.clientePodeAvaliar(clienteId, livroId)) {
+                throw new IllegalStateException("Avalie somente livros que você já comprou ou alugou.");
+            }
             repositorio.avaliarExperiencia(clienteId, livroId, nota, comentario);
             return;
         }
@@ -243,7 +246,26 @@ public class BibliotecaService {
         if (nota < 0 || nota > 5) {
             throw new IllegalArgumentException("A nota deve estar entre 0 e 5.");
         }
-        cliente.adicionarAvaliacao(new Avaliacao(livroId, nota, comentario));
+        boolean possuiPedido = cliente.getHistoricoPedidos().stream()
+                .filter(pedido -> pedido.getStatus() != StatusPedido.PENDENTE
+                        && pedido.getStatus() != StatusPedido.CANCELADO)
+                .flatMap(pedido -> pedido.getItens().stream())
+                .anyMatch(item -> Objects.equals(item.getLivro().getId(), livroId));
+        if (!possuiPedido) {
+            throw new IllegalStateException("Avalie somente livros que você já comprou ou alugou.");
+        }
+        cliente.adicionarAvaliacao(new Avaliacao(
+                livroId, nota, comentario, cliente.getNome(), java.time.LocalDate.now(), false));
+    }
+
+    public List<Avaliacao> buscarAvaliacoesLivro(Long livroId) {
+        if (repositorio != null) {
+            return repositorio.buscarAvaliacoesLivro(livroId);
+        }
+        return clientes.values().stream()
+                .flatMap(cliente -> cliente.getAvaliacoes().stream())
+                .filter(avaliacao -> livroId == null || Objects.equals(avaliacao.getLivroId(), livroId))
+                .collect(Collectors.toList());
     }
 
     public List<Avaliacao> consultarAvaliacoes(Long clienteId) {

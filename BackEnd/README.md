@@ -4,7 +4,7 @@ Backend Java com regras de negócio, persistência MySQL e API REST para o front
 
 ## Banco de dados
 
-Inicie um servidor MySQL e crie o banco/tabelas executando `database/schema.sql` no MySQL Workbench ou cliente MySQL. O script também insere um pequeno catálogo demonstrativo sem duplicar livros existentes. O backend executa o esquema novamente ao iniciar, para garantir que tabelas novas sejam criadas.
+Inicie um servidor MySQL e crie o banco/tabelas executando `database/schema.sql` no MySQL Workbench ou cliente MySQL. O script insere dez livros e avaliações demonstrativas sem duplicar os dados existentes. O backend executa o esquema novamente ao iniciar.
 
 Configure as variáveis para conectar ao seu MySQL:
 
@@ -43,8 +43,10 @@ A API fica em `http://127.0.0.1:8080/api` e permanece ativa até encerrar o proc
 - `POST /api/auth/login` — login (`email`, `senha`); retorna token de sessão
 - `GET /api/pedidos` — histórico do cliente autenticado
 - `POST /api/pedidos` — compra ou aluguel (`livroId`, `quantidade`, `tipo`, `pagamento`)
+- `GET /api/avaliacoes?livroId=1` — avaliações de um livro ou do catálogo inteiro
+- `POST /api/avaliacoes` — avaliação autenticada (`livroId`, `nota`, `comentario`); exige compra ou aluguel
 
-Pedidos exigem o cabeçalho `Authorization: Bearer <token>`. Sessões ficam em memória e expiram ao reiniciar a API. Os pagamentos são simulados; nenhuma cobrança é enviada a uma operadora. O Vite encaminha `/api` ao backend durante o desenvolvimento.
+Pedidos e avaliações exigem o cabeçalho `Authorization: Bearer <token>`. Sessões ficam em memória e expiram ao reiniciar a API. As avaliações iniciais são identificadas como demonstrativas. Os pagamentos são simulados; nenhuma cobrança é enviada a uma operadora. O Vite encaminha `/api` ao backend durante o desenvolvimento.
 
 ## Estrutura
 

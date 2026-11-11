@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -22,6 +22,8 @@ function App() {
   const [livros, setLivros] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erroCatalogo, setErroCatalogo] = useState('');
+  const [avaliacoes, setAvaliacoes] = useState([]);
+  const [erroAvaliacoes, setErroAvaliacoes] = useState('');
   const [modoCadastro, setModoCadastro] = useState(false);
   const [formulario, setFormulario] = useState({
     nome: '',
@@ -31,8 +33,22 @@ function App() {
   });
   const [sessao, setSessao] = useState(null);
   const [pagamento, setPagamento] = useState('PIX');
+  const [mostrarHistorico, setMostrarHistorico] = useState(false);
+  const [historico, setHistorico] = useState([]);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  const [erroHistorico, setErroHistorico] = useState('');
+  const [atualizacaoHistorico, setAtualizacaoHistorico] = useState(0);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
+
+  const avaliacoesPorLivro = useMemo(() => {
+    return avaliacoes.reduce((porLivro, avaliacao) => {
+      const lista = porLivro.get(avaliacao.livroId) || [];
+      lista.push(avaliacao);
+      porLivro.set(avaliacao.livroId, lista);
+      return porLivro;
+    }, new Map());
+  }, [avaliacoes]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -55,6 +71,36 @@ function App() {
 
     return () => controller.abort();
   }, [busca]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setErroAvaliacoes('');
+    apiRequest('/avaliacoes', { signal: controller.signal })
+      .then(setAvaliacoes)
+      .catch((error) => {
+        if (error.name !== 'AbortError') setErroAvaliacoes(error.message);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!sessao || !mostrarHistorico) return undefined;
+    const controller = new AbortController();
+    setCarregandoHistorico(true);
+    setErroHistorico('');
+    apiRequest('/pedidos', {
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${sessao.token}` },
+    })
+      .then(setHistorico)
+      .catch((error) => {
+        if (error.name !== 'AbortError') setErroHistorico(error.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCarregandoHistorico(false);
+      });
+    return () => controller.abort();
+  }, [sessao, mostrarHistorico, atualizacaoHistorico]);
 
   function atualizarCampo(event) {
     setFormulario((atual) => ({ ...atual, [event.target.name]: event.target.value }));
@@ -102,7 +148,8 @@ function App() {
       setMensagem(
         `Pedido #${pedido.id} ${tipo === 'ALUGUEL' ? 'alugado' : 'comprado'} com sucesso.`
       );
-      setBusca((atual) => atual);
+      setMostrarHistorico(true);
+      setAtualizacaoHistorico((atual) => atual + 1);
       const atualizado = await apiRequest(`/livros?busca=${encodeURIComponent(busca)}`);
       setLivros(atualizado);
     } catch (error) {
@@ -110,8 +157,34 @@ function App() {
     }
   }
 
+  async function enviarAvaliacao(event, livroId) {
+    event.preventDefault();
+    setErro('');
+    setMensagem('');
+    const form = event.currentTarget;
+    const dados = new FormData(event.currentTarget);
+    try {
+      await apiRequest('/avaliacoes', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${sessao.token}` },
+        body: JSON.stringify({
+          livroId,
+          nota: Number(dados.get('nota')),
+          comentario: dados.get('comentario'),
+        }),
+      });
+      setMensagem('Sua avaliação foi registrada.');
+      setAvaliacoes(await apiRequest('/avaliacoes'));
+      form.reset();
+    } catch (error) {
+      setErro(error.message);
+    }
+  }
+
   function sair() {
     setSessao(null);
+    setMostrarHistorico(false);
+    setHistorico([]);
     setMensagem('Você saiu da sua conta.');
     setErro('');
   }
@@ -144,6 +217,13 @@ function App() {
               <>
                 <h3>Olá, {sessao.usuario.nome}</h3>
                 <p className="account-email">{sessao.usuario.email}</p>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => setMostrarHistorico((atual) => !atual)}
+                >
+                  {mostrarHistorico ? 'Ocultar histórico' : 'Meu histórico'}
+                </button>
                 <button type="button" onClick={sair}>Sair</button>
               </>
             ) : (
@@ -210,6 +290,41 @@ function App() {
           </div>
         )}
 
+        {sessao && mostrarHistorico && (
+          <section id="historico" className="history-section">
+            <div className="section-header">
+              <h3>Meu histórico</h3>
+              <span>{historico.length} pedido(s)</span>
+            </div>
+            {carregandoHistorico && <p>Carregando histórico...</p>}
+            {erroHistorico && <p className="notice-error">{erroHistorico}</p>}
+            {!carregandoHistorico && !erroHistorico && historico.length === 0 && (
+              <p>Você ainda não fez compras ou aluguéis.</p>
+            )}
+            <div className="history-list">
+              {historico.map((pedido) => (
+                <article key={pedido.id} className="history-card">
+                  <div className="history-heading">
+                    <strong>Pedido #{pedido.id}</strong>
+                    <span>{pedido.tipo === 'ALUGUEL' ? 'Aluguel' : 'Compra'} · {pedido.status}</span>
+                  </div>
+                  <p>
+                    {pedido.data} · Pagamento: {pedido.pagamento} · Total: R${' '}
+                    {Number(pedido.valorTotal).toFixed(2)}
+                  </p>
+                  <ul>
+                    {pedido.itens.map((item) => (
+                      <li key={`${pedido.id}-${item.livroId}`}>
+                        {item.nome} × {item.quantidade}
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section id="catalogo" className="catalog-section">
           <div className="section-header">
             <h3>Catálogo</h3>
@@ -252,6 +367,52 @@ function App() {
                   <li><strong>Ano:</strong> {livro.anoPublicacao}</li>
                   <li><strong>Preço:</strong> R$ {Number(livro.preco).toFixed(2)}</li>
                 </ul>
+                {(() => {
+                  const listaAvaliacoes = avaliacoesPorLivro.get(livro.id) || [];
+                  const media = listaAvaliacoes.length
+                    ? listaAvaliacoes.reduce((soma, item) => soma + item.nota, 0) / listaAvaliacoes.length
+                    : 0;
+                  return (
+                    <details className="reviews-section">
+                      <summary>
+                        {listaAvaliacoes.length
+                          ? `★ ${media.toFixed(1)} · ${listaAvaliacoes.length} avaliação(ões)`
+                          : 'Sem avaliações'}
+                      </summary>
+                      {erroAvaliacoes && <p className="notice-error">{erroAvaliacoes}</p>}
+                      <div className="review-list">
+                        {listaAvaliacoes.map((avaliacao, indice) => (
+                          <div key={`${livro.id}-${avaliacao.cliente}-${indice}`} className="review-item">
+                            <strong>{avaliacao.cliente || 'Cliente'} · {'★'.repeat(avaliacao.nota)}</strong>
+                            <p>{avaliacao.comentario || 'Sem comentário.'}</p>
+                            {avaliacao.demonstracao && (
+                              <small>Avaliação demonstrativa</small>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {sessao && (
+                        <form className="review-form" onSubmit={(event) => enviarAvaliacao(event, livro.id)}>
+                          <label>
+                            Sua nota
+                            <select name="nota" defaultValue="5">
+                              <option value="5">5 estrelas</option>
+                              <option value="4">4 estrelas</option>
+                              <option value="3">3 estrelas</option>
+                              <option value="2">2 estrelas</option>
+                              <option value="1">1 estrela</option>
+                            </select>
+                          </label>
+                          <textarea name="comentario" placeholder="Escreva um comentário (opcional)" rows="2" />
+                          <button type="submit">Avaliar</button>
+                        </form>
+                      )}
+                      {!sessao && (
+                        <p className="review-login-hint">Entre e compre ou alugue este livro para avaliá-lo.</p>
+                      )}
+                    </details>
+                  );
+                })()}
                 <div className="book-actions">
                   <button
                     type="button"

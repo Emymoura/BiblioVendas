@@ -1,6 +1,6 @@
 # Frontend BiblioVendas
 
-Interface React conectada à API REST do backend. Catálogo, busca, login/cadastro e pedidos usam dados do MySQL através dos endpoints `/api`.
+Interface React conectada à API REST do backend. Catálogo, busca, login/cadastro, histórico de pedidos e avaliações usam dados do MySQL através dos endpoints `/api`.
 
 ## Executar
 

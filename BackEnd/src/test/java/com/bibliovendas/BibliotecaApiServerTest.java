@@ -56,6 +56,16 @@ class BibliotecaApiServerTest {
         assertEquals(201, pedido.status);
         assertEquals("CONFIRMADO", pedido.body.get("status").asText());
 
+        Response avaliacao = request("POST", "/api/avaliacoes", token,
+                "{\"livroId\":1,\"nota\":5,\"comentario\":\"Gostei muito\"}");
+        assertEquals(201, avaliacao.status);
+        assertEquals("Ana", avaliacao.body.get("cliente").asText());
+
+        Response avaliacoes = request("GET", "/api/avaliacoes?livroId=1", null, null);
+        assertEquals(200, avaliacoes.status);
+        assertEquals(1, avaliacoes.body.size());
+        assertEquals(5, avaliacoes.body.get(0).get("nota").asInt());
+
         Response historico = request("GET", "/api/pedidos", token, null);
         assertEquals(200, historico.status);
         assertEquals(1, historico.body.size());
@@ -69,6 +79,17 @@ class BibliotecaApiServerTest {
 
         assertEquals(401, resposta.status);
         assertTrue(resposta.body.has("erro"));
+    }
+
+    @Test
+    void naoDevePermitirAvaliacaoSemCompraOuAluguel() throws Exception {
+        Response cadastro = request("POST", "/api/clientes", null,
+                "{\"nome\":\"Ana\",\"email\":\"sem-pedido@example.test\",\"senha\":\"senha12345\",\"endereco\":\"Centro\"}");
+        Response resposta = request("POST", "/api/avaliacoes", cadastro.body.get("token").asText(),
+                "{\"livroId\":1,\"nota\":4,\"comentario\":\"Ainda não comprei\"}");
+
+        assertEquals(409, resposta.status);
+        assertTrue(resposta.body.get("erro").asText().contains("comprou ou alugou"));
     }
 
     private Response request(String method, String path, String token, String body) throws Exception {
