@@ -23,11 +23,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -83,14 +85,20 @@ public class BibliotecaApiServer implements AutoCloseable {
                 responder(exchange, 200, json.createObjectNode().put("status", "ok"));
             } else if ("GET".equals(method) && "/api/livros".equals(path)) {
                 listarLivros(exchange);
+            } else if ("GET".equals(method) && isRotaLivro(path)) {
+                listarLivro(exchange, path);
             } else if ("POST".equals(method) && "/api/clientes".equals(path)) {
                 cadastrarCliente(exchange);
             } else if ("POST".equals(method) && "/api/auth/login".equals(path)) {
                 login(exchange);
+            } else if ("GET".equals(method) && "/api/auth/session".equals(path)) {
+                validarSessao(exchange);
             } else if ("POST".equals(method) && "/api/pedidos".equals(path)) {
                 criarPedido(exchange);
             } else if ("GET".equals(method) && "/api/pedidos".equals(path)) {
                 listarPedidos(exchange);
+            } else if ("POST".equals(method) && isRotaReembolso(path)) {
+                reembolsarPedido(exchange, path);
             } else if ("GET".equals(method) && "/api/avaliacoes".equals(path)) {
                 listarAvaliacoes(exchange);
             } else if ("POST".equals(method) && "/api/avaliacoes".equals(path)) {
@@ -129,15 +137,29 @@ public class BibliotecaApiServer implements AutoCloseable {
         responder(exchange, 200, resposta);
     }
 
+    private void listarLivro(HttpExchange exchange, String path) throws IOException {
+        long livroId;
+        try {
+            livroId = Long.parseLong(path.substring("/api/livros/".length()));
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("O identificador do livro é inválido.");
+        }
+        Livro livro = service.buscarLivro(livroId)
+                .orElseThrow(() -> new IllegalArgumentException("Livro não encontrado."));
+        responder(exchange, 200, livroJson(livro));
+    }
+
+    private boolean isRotaLivro(String path) {
+        return path.startsWith("/api/livros/")
+                && path.length() > "/api/livros/".length();
+    }
+
     private void cadastrarCliente(HttpExchange exchange) throws IOException {
         JsonNode corpo = lerCorpo(exchange);
         String nome = textoObrigatorio(corpo, "nome");
         String email = textoObrigatorio(corpo, "email");
         String senha = textoObrigatorio(corpo, "senha");
         String endereco = textoObrigatorio(corpo, "endereco");
-        if (senha.length() < 4) {
-            throw new IllegalArgumentException("A senha deve ter pelo menos 4 caracteres.");
-        }
 
         Cliente cliente = service.cadastrarCliente(nome, email, senha, endereco);
         responder(exchange, 201, sessaoJson(cliente));
@@ -152,14 +174,15 @@ public class BibliotecaApiServer implements AutoCloseable {
         responder(exchange, 200, sessaoJson(cliente));
     }
 
+    private void validarSessao(HttpExchange exchange) throws IOException {
+        Cliente cliente = clienteAutenticado(exchange);
+        responder(exchange, 200, json.createObjectNode().set("usuario", usuarioJson(cliente)));
+    }
+
     private void criarPedido(HttpExchange exchange) throws IOException {
         Cliente cliente = clienteAutenticado(exchange);
         JsonNode corpo = lerCorpo(exchange);
-        long livroId = numeroObrigatorio(corpo, "livroId");
-        int quantidade = inteiroObrigatorio(corpo, "quantidade");
-        if (quantidade <= 0) {
-            throw new IllegalArgumentException("A quantidade deve ser positiva.");
-        }
+        Map<Long, Integer> quantidades = lerItensPedido(corpo);
 
         TipoPedido tipo;
         try {
@@ -168,27 +191,131 @@ public class BibliotecaApiServer implements AutoCloseable {
             throw new IllegalArgumentException("O tipo deve ser COMPRA ou ALUGUEL.");
         }
 
-        Livro livro = service.listarCatalogo().stream()
-                .filter(item -> item.getId().longValue() == livroId)
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Livro não encontrado."));
+        if (tipo == TipoPedido.ALUGUEL && quantidades.size() != 1) {
+            throw new IllegalArgumentException("Cada aluguel deve conter exatamente um livro.");
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        for (Map.Entry<Long, Integer> item : quantidades.entrySet()) {
+            Livro livro = service.buscarLivro(item.getKey())
+                    .orElseThrow(() -> new IllegalArgumentException("Livro não encontrado."));
+            total = total.add(livro.getPreco().multiply(BigDecimal.valueOf(item.getValue())));
+        }
         String metodo = textoObrigatorio(corpo, "pagamento").toUpperCase();
-        Pagamento pagamento = criarPagamento(metodo, livro, quantidade, cliente);
+        Pagamento pagamento = criarPagamento(metodo, total, cliente);
 
-        Pedido pedido = tipo == TipoPedido.COMPRA
-                ? service.efetuarCompra(cliente, livroId, quantidade, pagamento)
-                : service.efetuarAluguel(cliente, livroId, quantidade, pagamento);
+        Pedido pedido;
+        if (tipo == TipoPedido.COMPRA) {
+            pedido = service.efetuarCompra(cliente, quantidades, pagamento);
+        } else {
+            Map.Entry<Long, Integer> item = quantidades.entrySet().iterator().next();
+            pedido = service.efetuarAluguel(cliente, item.getKey(), item.getValue(), pagamento);
+        }
         responder(exchange, 201, pedidoJson(pedido));
+    }
+
+    private Map<Long, Integer> lerItensPedido(JsonNode corpo) {
+        Map<Long, Integer> quantidades = new LinkedHashMap<>();
+        JsonNode itens = corpo.get("itens");
+        if (itens == null) {
+            long livroId = numeroObrigatorio(corpo, "livroId");
+            int quantidade = inteiroObrigatorio(corpo, "quantidade");
+            adicionarItemPedido(quantidades, livroId, quantidade);
+            return quantidades;
+        }
+        if (!itens.isArray() || itens.isEmpty()) {
+            throw new IllegalArgumentException("O pedido deve conter ao menos um livro.");
+        }
+        for (JsonNode item : itens) {
+            long livroId = numeroObrigatorio(item, "livroId");
+            int quantidade = inteiroObrigatorio(item, "quantidade");
+            adicionarItemPedido(quantidades, livroId, quantidade);
+        }
+        return quantidades;
+    }
+
+    private void adicionarItemPedido(Map<Long, Integer> quantidades, long livroId, int quantidade) {
+        if (livroId < 1 || quantidade < 1) {
+            throw new IllegalArgumentException("Cada item deve informar um livro e uma quantidade positiva.");
+        }
+        if (quantidades.putIfAbsent(livroId, quantidade) != null) {
+            throw new IllegalArgumentException("O mesmo livro não pode aparecer mais de uma vez no pedido.");
+        }
     }
 
     private void listarPedidos(HttpExchange exchange) throws IOException {
         Cliente cliente = clienteAutenticado(exchange);
-        List<Pedido> pedidos = service.consultarHistoricoCliente(cliente.getId());
+        String paginaQuery = parametroConsulta(exchange, "pagina");
+        String limiteQuery = parametroConsulta(exchange, "limite");
+        String tipoQuery = parametroConsulta(exchange, "tipo");
         ArrayNode resposta = json.createArrayNode();
-        for (Pedido pedido : pedidos) {
+        if (paginaQuery == null && limiteQuery == null && tipoQuery == null) {
+            for (Pedido pedido : service.consultarHistoricoCliente(cliente.getId())) {
+                resposta.add(pedidoJson(pedido));
+            }
+            responder(exchange, 200, resposta);
+            return;
+        }
+
+        int pagina = inteiroConsulta(paginaQuery, 1, "pagina");
+        int limite = inteiroConsulta(limiteQuery, 5, "limite");
+        if (pagina < 1 || limite < 1 || limite > 50) {
+            throw new IllegalArgumentException("A página deve ser positiva e o limite deve estar entre 1 e 50.");
+        }
+        TipoPedido tipo = null;
+        if (tipoQuery != null && !tipoQuery.trim().isEmpty()) {
+            try {
+                tipo = TipoPedido.valueOf(tipoQuery.toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                throw new IllegalArgumentException("O tipo deve ser COMPRA ou ALUGUEL.");
+            }
+        }
+        int total = service.contarPedidosCliente(cliente.getId(), tipo);
+        for (Pedido pedido : service.consultarHistoricoCliente(cliente.getId(), pagina, limite, tipo)) {
             resposta.add(pedidoJson(pedido));
         }
-        responder(exchange, 200, resposta);
+        ObjectNode paginaJson = json.createObjectNode();
+        paginaJson.set("pedidos", resposta);
+        paginaJson.put("pagina", pagina);
+        paginaJson.put("limite", limite);
+        paginaJson.put("total", total);
+        paginaJson.put("totalPaginas", Math.max(1, (int) Math.ceil((double) total / limite)));
+        responder(exchange, 200, paginaJson);
+    }
+
+    private void reembolsarPedido(HttpExchange exchange, String path) throws IOException {
+        Cliente cliente = clienteAutenticado(exchange);
+        String id = path.substring("/api/pedidos/".length(), path.length() - "/reembolso".length());
+        long pedidoId;
+        try {
+            pedidoId = Long.parseLong(id);
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("O identificador do pedido é inválido.");
+        }
+        if (pedidoId < 1) {
+            throw new IllegalArgumentException("O identificador do pedido é inválido.");
+        }
+        service.reembolsarPedido(cliente.getId(), pedidoId);
+        responder(exchange, 200, json.createObjectNode()
+                .put("pedidoId", pedidoId)
+                .put("status", "REEMBOLSADO")
+                .put("reembolsoSimulado", true));
+    }
+
+    private boolean isRotaReembolso(String path) {
+        return path.startsWith("/api/pedidos/")
+                && path.endsWith("/reembolso")
+                && path.length() > "/api/pedidos//reembolso".length();
+    }
+
+    private int inteiroConsulta(String valor, int padrao, String nome) {
+        if (valor == null || valor.trim().isEmpty()) {
+            return padrao;
+        }
+        try {
+            return Integer.parseInt(valor);
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException(nome + " deve ser um número inteiro.");
+        }
     }
 
     private void listarAvaliacoes(HttpExchange exchange) throws IOException {
@@ -228,8 +355,7 @@ public class BibliotecaApiServer implements AutoCloseable {
                 .put("demonstracao", false));
     }
 
-    private Pagamento criarPagamento(String metodo, Livro livro, int quantidade, Cliente cliente) {
-        java.math.BigDecimal total = livro.getPreco().multiply(java.math.BigDecimal.valueOf(quantidade));
+    private Pagamento criarPagamento(String metodo, BigDecimal total, Cliente cliente) {
         if ("PIX".equals(metodo)) {
             return new Pix(total, "pagamento-simulado");
         }
@@ -245,13 +371,17 @@ public class BibliotecaApiServer implements AutoCloseable {
     private ObjectNode sessaoJson(Cliente cliente) {
         String token = UUID.randomUUID().toString();
         sessoes.put(token, cliente);
+        return json.createObjectNode()
+                .put("token", token)
+                .set("usuario", usuarioJson(cliente));
+    }
+
+    private ObjectNode usuarioJson(Cliente cliente) {
         ObjectNode usuario = json.createObjectNode()
                 .put("id", cliente.getId())
                 .put("nome", cliente.getNome())
                 .put("email", cliente.getEmail());
-        return json.createObjectNode()
-                .put("token", token)
-                .set("usuario", usuario);
+        return usuario;
     }
 
     private Cliente clienteAutenticado(HttpExchange exchange) {
@@ -291,6 +421,11 @@ public class BibliotecaApiServer implements AutoCloseable {
                 .put("tipo", pedido.getTipoPedido().name())
                 .put("pagamento", pedido.getPagamento().getTipo())
                 .put("valorTotal", pedido.getValorTotal());
+        if (pedido.getDataFimAluguel() == null) {
+            resposta.putNull("dataFimAluguel");
+        } else {
+            resposta.put("dataFimAluguel", pedido.getDataFimAluguel().toString());
+        }
         ArrayNode itens = resposta.putArray("itens");
         pedido.getItens().forEach(item -> itens.add(json.createObjectNode()
                 .put("livroId", item.getLivro().getId())

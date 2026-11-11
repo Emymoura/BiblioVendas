@@ -5,17 +5,21 @@ import com.bibliovendas.model.Cartao;
 import com.bibliovendas.model.Catalogo;
 import com.bibliovendas.model.Cliente;
 import com.bibliovendas.model.Livro;
+import com.bibliovendas.model.ItemPedido;
 import com.bibliovendas.model.Pagamento;
 import com.bibliovendas.model.Pedido;
 import com.bibliovendas.model.Pix;
 import com.bibliovendas.model.PrestadorServico;
 import com.bibliovendas.model.Boleto;
+import com.bibliovendas.model.SenhaUtil;
 import com.bibliovendas.model.StatusPedido;
 import com.bibliovendas.model.TipoPedido;
 import com.bibliovendas.persistence.MySqlBibliotecaRepository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +48,7 @@ public class BibliotecaService {
     }
 
     public Cliente cadastrarCliente(String nome, String email, String senha, String endereco) {
+        SenhaUtil.validarPolitica(senha);
         if (repositorio != null) {
             return repositorio.cadastrarCliente(nome, email, senha, endereco);
         }
@@ -53,6 +58,7 @@ public class BibliotecaService {
     }
 
     public PrestadorServico cadastrarPrestador(String nome, String email, String senha, String endereco) {
+        SenhaUtil.validarPolitica(senha);
         if (repositorio != null) {
             return repositorio.cadastrarPrestador(nome, email, senha, endereco);
         }
@@ -108,29 +114,47 @@ public class BibliotecaService {
         return catalogo.listarLivros();
     }
 
-    public Pedido efetuarCompra(Cliente cliente, Long livroId, int quantidade, Pagamento pagamento) {
+    public Optional<Livro> buscarLivro(Long livroId) {
         if (repositorio != null) {
-            if (quantidade <= 0) {
-                throw new IllegalArgumentException("Quantidade deve ser positiva.");
-            }
-            Livro livro = repositorio.buscarLivro(livroId)
-                    .orElseThrow(() -> new IllegalArgumentException("Livro não encontrado."));
-            if (!livro.isDisponivel() || livro.getQuantidade() < quantidade) {
-                throw new IllegalStateException("Livro indisponível para compra.");
-            }
-            return repositorio.registrarPedido(cliente, livro, quantidade, pagamento,
-                    TipoPedido.COMPRA, StatusPedido.CONFIRMADO);
+            return repositorio.buscarLivro(livroId);
         }
-        Livro livro = catalogo.buscarPorId(livroId)
-                .orElseThrow(() -> new IllegalArgumentException("Livro não encontrado."));
+        return catalogo.buscarPorId(livroId);
+    }
 
-        if (!livro.isDisponivel() || livro.getQuantidade() < quantidade) {
-            throw new IllegalStateException("Livro indisponível para compra.");
+    public Pedido efetuarCompra(Cliente cliente, Long livroId, int quantidade, Pagamento pagamento) {
+        Map<Long, Integer> itens = new HashMap<>();
+        itens.put(livroId, quantidade);
+        return efetuarCompra(cliente, itens, pagamento);
+    }
+
+    public Pedido efetuarCompra(Cliente cliente, Map<Long, Integer> quantidades, Pagamento pagamento) {
+        if (quantidades == null || quantidades.isEmpty()) {
+            throw new IllegalArgumentException("Adicione pelo menos um livro ao carrinho.");
+        }
+        List<ItemPedido> itens = new ArrayList<>();
+        for (Map.Entry<Long, Integer> entrada : quantidades.entrySet()) {
+            if (entrada.getKey() == null || entrada.getValue() == null || entrada.getValue() <= 0) {
+                throw new IllegalArgumentException("Cada item deve informar um livro e uma quantidade positiva.");
+            }
+            Livro livro = buscarLivro(entrada.getKey())
+                    .orElseThrow(() -> new IllegalArgumentException("Livro não encontrado."));
+            if (!livro.isDisponivel() || livro.getQuantidade() < entrada.getValue()) {
+                throw new IllegalStateException("Estoque insuficiente para \"" + livro.getNome() + "\".");
+            }
+            itens.add(new ItemPedido(livro, entrada.getValue()));
+        }
+        if (repositorio != null) {
+            return repositorio.registrarPedido(cliente, itens, pagamento,
+                    TipoPedido.COMPRA, StatusPedido.CONFIRMADO);
         }
 
         Pedido pedido = new Pedido(nextId++, cliente, TipoPedido.COMPRA, pagamento);
-        pedido.adicionarItem(livro, quantidade);
-        livro.reduzirQuantidade(quantidade);
+        for (ItemPedido item : itens) {
+            Livro livro = item.getLivro();
+            pedido.adicionarItem(livro, item.getQuantidade(),
+                    item.getNomeLivro(), item.getPrecoUnitario());
+            livro.reduzirQuantidade(item.getQuantidade());
+        }
         pedido.setStatus(StatusPedido.CONFIRMADO);
         cliente.adicionarPedido(pedido);
         pedidos.put(pedido.getId(), pedido);
@@ -138,10 +162,10 @@ public class BibliotecaService {
     }
 
     public Pedido efetuarAluguel(Cliente cliente, Long livroId, int quantidade, Pagamento pagamento) {
+        if (quantidade != 1) {
+            throw new IllegalArgumentException("Cada aluguel deve conter exatamente um livro.");
+        }
         if (repositorio != null) {
-            if (quantidade <= 0) {
-                throw new IllegalArgumentException("Quantidade deve ser positiva.");
-            }
             Livro livro = repositorio.buscarLivro(livroId)
                     .orElseThrow(() -> new IllegalArgumentException("Livro não encontrado."));
             if (!livro.isDigital()) {
@@ -161,6 +185,15 @@ public class BibliotecaService {
         }
         if (!livro.isDisponivel() || quantidade <= 0) {
             throw new IllegalStateException("Aluguel inválido.");
+        }
+        atualizarAlugueisExpirados(cliente);
+        boolean aluguelAtivo = cliente.getHistoricoPedidos().stream()
+                .filter(pedido -> pedido.getTipoPedido() == TipoPedido.ALUGUEL
+                        && pedido.getStatus() == StatusPedido.ATIVO)
+                .flatMap(pedido -> pedido.getItens().stream())
+                .anyMatch(item -> Objects.equals(item.getLivro().getId(), livroId));
+        if (aluguelAtivo) {
+            throw new IllegalStateException("Você já possui um aluguel ativo deste livro.");
         }
 
         Pedido pedido = new Pedido(nextId++, cliente, TipoPedido.ALUGUEL, pagamento);
@@ -210,7 +243,83 @@ public class BibliotecaService {
         if (cliente == null) {
             throw new IllegalArgumentException("Cliente não encontrado.");
         }
+        atualizarAlugueisExpirados(cliente);
         return new ArrayList<>(cliente.getHistoricoPedidos());
+    }
+
+    public List<Pedido> consultarHistoricoCliente(Long clienteId, int pagina, int limite, TipoPedido tipo) {
+        if (pagina < 1 || limite < 1 || limite > 50) {
+            throw new IllegalArgumentException("A página deve ser positiva e o limite deve estar entre 1 e 50.");
+        }
+        if (repositorio != null) {
+            return repositorio.consultarHistoricoCliente(clienteId, pagina, limite, tipo);
+        }
+        Cliente cliente = clientes.get(clienteId);
+        if (cliente == null) {
+            throw new IllegalArgumentException("Cliente não encontrado.");
+        }
+        atualizarAlugueisExpirados(cliente);
+        return cliente.getHistoricoPedidos().stream()
+                .filter(pedido -> tipo == null || pedido.getTipoPedido() == tipo)
+                .sorted(Comparator.comparing(Pedido::getData).reversed()
+                        .thenComparing(Pedido::getId, Comparator.reverseOrder()))
+                .skip((long) (pagina - 1) * limite)
+                .limit(limite)
+                .collect(Collectors.toList());
+    }
+
+    public int contarPedidosCliente(Long clienteId, TipoPedido tipo) {
+        if (repositorio != null) {
+            return repositorio.contarPedidosCliente(clienteId, tipo);
+        }
+        Cliente cliente = clientes.get(clienteId);
+        if (cliente == null) {
+            throw new IllegalArgumentException("Cliente não encontrado.");
+        }
+        atualizarAlugueisExpirados(cliente);
+        return (int) cliente.getHistoricoPedidos().stream()
+                .filter(pedido -> tipo == null || pedido.getTipoPedido() == tipo)
+                .count();
+    }
+
+    public void reembolsarPedido(Long clienteId, Long pedidoId) {
+        if (repositorio != null) {
+            repositorio.reembolsarPedido(clienteId, pedidoId);
+            return;
+        }
+        Cliente cliente = clientes.get(clienteId);
+        if (cliente == null) {
+            throw new IllegalArgumentException("Cliente não encontrado.");
+        }
+        Pedido pedido = cliente.getHistoricoPedidos().stream()
+                .filter(item -> Objects.equals(item.getId(), pedidoId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Pedido não encontrado."));
+        if (pedido.getTipoPedido() != TipoPedido.COMPRA) {
+            throw new IllegalStateException("Somente compras podem ser reembolsadas.");
+        }
+        if (pedido.getStatus() != StatusPedido.CONFIRMADO) {
+            throw new IllegalStateException("Este pedido não está disponível para reembolso.");
+        }
+        if (pedido.getData().isBefore(LocalDate.now().minusDays(7))) {
+            throw new IllegalStateException("O prazo de reembolso de 7 dias terminou.");
+        }
+        pedido.setStatus(StatusPedido.REEMBOLSADO);
+        pedido.getItens().forEach(item -> {
+            Livro livro = item.getLivro();
+            livro.setQuantidade(livro.getQuantidade() + item.getQuantidade());
+            livro.setDisponivel(true);
+        });
+    }
+
+    private void atualizarAlugueisExpirados(Cliente cliente) {
+        LocalDate hoje = LocalDate.now();
+        cliente.getHistoricoPedidos().stream()
+                .filter(pedido -> pedido.getTipoPedido() == TipoPedido.ALUGUEL
+                        && pedido.getStatus() == StatusPedido.ATIVO
+                        && pedido.getDataFimAluguel() != null
+                        && !hoje.isBefore(pedido.getDataFimAluguel()))
+                .forEach(pedido -> pedido.setStatus(StatusPedido.EXPIRADO));
     }
 
     public void atualizarDadosCliente(Long clienteId, String nome, String email, String endereco) {

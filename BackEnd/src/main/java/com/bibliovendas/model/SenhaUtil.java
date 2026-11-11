@@ -16,15 +16,34 @@ public final class SenhaUtil {
     }
 
     public static String gerarHash(String senha) {
-        if (senha == null || senha.isEmpty()) {
-            throw new IllegalArgumentException("A senha é obrigatória.");
-        }
+        validarPolitica(senha);
 
         byte[] salt = new byte[SALT_LENGTH];
         RANDOM.nextBytes(salt);
         byte[] hash = derivar(senha.toCharArray(), salt, ITERATIONS);
         return "pbkdf2$" + ITERATIONS + "$" + Base64.getEncoder().encodeToString(salt)
                 + "$" + Base64.getEncoder().encodeToString(hash);
+    }
+
+    public static void validarPolitica(String senha) {
+        if (senha == null || senha.codePointCount(0, senha.length()) < 8) {
+            throw new IllegalArgumentException("A senha deve ter pelo menos 8 caracteres.");
+        }
+
+        boolean maiuscula = false;
+        boolean numero = false;
+        boolean especial = false;
+        for (int indice = 0; indice < senha.length();) {
+            int caractere = senha.codePointAt(indice);
+            maiuscula |= Character.isUpperCase(caractere);
+            numero |= Character.isDigit(caractere);
+            especial |= !Character.isLetterOrDigit(caractere);
+            indice += Character.charCount(caractere);
+        }
+        if (!maiuscula || !numero || !especial) {
+            throw new IllegalArgumentException(
+                    "A senha deve conter uma letra maiúscula, um número e um caractere especial.");
+        }
     }
 
     public static boolean verificar(String senha, String senhaHash) {

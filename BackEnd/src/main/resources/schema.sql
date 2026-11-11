@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS pedidos (
     tipo_pedido VARCHAR(30) NOT NULL,
     pagamento_tipo VARCHAR(30) NOT NULL,
     pagamento_valor DECIMAL(10, 2) NOT NULL,
+    data_fim_aluguel DATE NULL,
     CONSTRAINT fk_pedidos_cliente FOREIGN KEY (cliente_id) REFERENCES usuarios(id)
 );
 
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS itens_pedido (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     pedido_id BIGINT NOT NULL,
     livro_id BIGINT NOT NULL,
+    nome_livro VARCHAR(200) NULL,
     quantidade INT NOT NULL,
     preco_unitario DECIMAL(10, 2) NOT NULL,
     CONSTRAINT fk_itens_pedido FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE,
