@@ -345,6 +345,52 @@ public class MySqlBibliotecaRepository {
         }
     }
 
+    public List<Avaliacao> buscarAvaliacoesLivro(Long livroId) {
+        String sql = "SELECT a.livro_id, a.nota, a.comentario, a.data_criacao, "
+                + "u.nome AS nome_cliente, (u.tipo = 'DEMO') AS demonstracao "
+                + "FROM avaliacoes a JOIN usuarios u ON u.id = a.cliente_id "
+                + "WHERE (? IS NULL OR a.livro_id = ?) ORDER BY a.data_criacao DESC, a.id DESC";
+        List<Avaliacao> avaliacoes = new ArrayList<>();
+        try (Connection connection = database.conectar();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            if (livroId == null) {
+                statement.setNull(1, java.sql.Types.BIGINT);
+                statement.setNull(2, java.sql.Types.BIGINT);
+            } else {
+                statement.setLong(1, livroId);
+                statement.setLong(2, livroId);
+            }
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    avaliacoes.add(new Avaliacao(result.getLong("livro_id"),
+                            result.getInt("nota"), result.getString("comentario"),
+                            result.getString("nome_cliente"),
+                            result.getTimestamp("data_criacao").toLocalDateTime().toLocalDate(),
+                            result.getBoolean("demonstracao")));
+                }
+            }
+            return avaliacoes;
+        } catch (SQLException ex) {
+            throw erro("Não foi possível carregar as avaliações dos livros.", ex);
+        }
+    }
+
+    public boolean clientePodeAvaliar(Long clienteId, Long livroId) {
+        String sql = "SELECT COUNT(*) FROM pedidos p JOIN itens_pedido i ON i.pedido_id = p.id "
+                + "WHERE p.cliente_id = ? AND i.livro_id = ? "
+                + "AND p.status IN ('CONFIRMADO', 'ENTREGUE', 'ATIVO', 'EXPIRADO')";
+        try (Connection connection = database.conectar();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, clienteId);
+            statement.setLong(2, livroId);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() && result.getLong(1) > 0;
+            }
+        } catch (SQLException ex) {
+            throw erro("Não foi possível validar a compra ou aluguel para avaliação.", ex);
+        }
+    }
+
     public boolean podeAcessarLivroDigital(Long clienteId, Long livroId) {
         String sql = "SELECT COUNT(*) FROM pedidos p JOIN itens_pedido i ON i.pedido_id = p.id "
                 + "JOIN livros l ON l.id = i.livro_id WHERE p.cliente_id = ? AND l.id = ? AND l.digital = TRUE "
