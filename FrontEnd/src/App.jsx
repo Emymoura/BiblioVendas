@@ -113,6 +113,7 @@ function App() {
   const [avaliacoes, setAvaliacoes] = useState([]);
   const [erroAvaliacoes, setErroAvaliacoes] = useState('');
   const [modoCadastro, setModoCadastro] = useState(false);
+  const [modoAdmin, setModoAdmin] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [formulario, setFormulario] = useState({
     nome: '',
@@ -122,6 +123,10 @@ function App() {
   });
   const [sessao, setSessao] = useState(null);
   const [validandoSessao, setValidandoSessao] = useState(true);
+  const [configuracao, setConfiguracao] = useState({
+    duracaoAluguelDias: 14,
+    formasPagamento: ['PIX', 'CARTAO', 'BOLETO'],
+  });
   const [pagamento, setPagamento] = useState('PIX');
   const [carrinho, setCarrinho] = useState(lerCarrinhoSalvo);
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
@@ -144,6 +149,21 @@ function App() {
   const [carregandoLivro, setCarregandoLivro] = useState(false);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
+  const [novoLivro, setNovoLivro] = useState({
+    nome: '',
+    sinopse: '',
+    categoria: '',
+    genero: '',
+    autor: '',
+    editora: '',
+    numeroPaginas: '',
+    anoPublicacao: '',
+    preco: '',
+    quantidade: '1',
+    digital: true,
+  });
+  const [estoqueAdmin, setEstoqueAdmin] = useState({});
+  const [disponibilidadeAdmin, setDisponibilidadeAdmin] = useState({});
 
   useEffect(() => {
     const controller = new AbortController();
@@ -255,6 +275,36 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const controller = new AbortController();
+    apiRequest('/configuracoes', { signal: controller.signal })
+      .then((dados) => {
+        if (controller.signal.aborted) return;
+        setConfiguracao(dados);
+        setPagamento((atual) => (
+          dados.formasPagamento.includes(atual) ? atual : dados.formasPagamento[0]
+        ));
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError') setErro(error.message);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (sessao?.usuario?.tipo !== 'ADMIN') return undefined;
+    const controller = new AbortController();
+    apiRequest('/admin/configuracoes', {
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${sessao.token}` },
+    })
+      .then(setConfiguracao)
+      .catch((error) => {
+        if (error.name !== 'AbortError') setErro(error.message);
+      });
+    return () => controller.abort();
+  }, [sessao]);
+
+  useEffect(() => {
     if (!sessao || !mostrarHistorico) return undefined;
     const controller = new AbortController();
     setCarregandoHistorico(true);
@@ -291,7 +341,7 @@ function App() {
     }
     try {
       const sessaoCriada = await apiRequest(
-        modoCadastro ? '/clientes' : '/auth/login',
+        modoCadastro ? '/clientes' : (modoAdmin ? '/admin/login' : '/auth/login'),
         {
           method: 'POST',
           body: JSON.stringify(formulario),
@@ -304,6 +354,99 @@ function App() {
       }
       setFormulario((atual) => ({ ...atual, senha: '' }));
       setMostrarSenha(false);
+    } catch (error) {
+      setErro(error.message);
+    }
+  }
+
+  async function salvarConfiguracoesAdmin(event) {
+    event.preventDefault();
+    setErro('');
+    setMensagem('');
+    try {
+      const atualizada = await apiRequest('/admin/configuracoes', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${sessao.token}` },
+        body: JSON.stringify(configuracao),
+      });
+      setConfiguracao(atualizada);
+      setMensagem('Configurações administrativas salvas.');
+    } catch (error) {
+      setErro(error.message);
+    }
+  }
+
+  async function cadastrarLivroAdmin(event) {
+    event.preventDefault();
+    setErro('');
+    setMensagem('');
+    try {
+      const livro = await apiRequest('/admin/livros', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${sessao.token}` },
+        body: JSON.stringify({
+          ...novoLivro,
+          numeroPaginas: Number(novoLivro.numeroPaginas),
+          anoPublicacao: Number(novoLivro.anoPublicacao),
+          preco: Number(novoLivro.preco),
+          quantidade: Number(novoLivro.quantidade),
+          disponivel: Number(novoLivro.quantidade) > 0,
+        }),
+      });
+      setLivros((atuais) => [...atuais, livro].sort((a, b) => a.nome.localeCompare(b.nome)));
+      setNovoLivro({
+        nome: '',
+        sinopse: '',
+        categoria: '',
+        genero: '',
+        autor: '',
+        editora: '',
+        numeroPaginas: '',
+        anoPublicacao: '',
+        preco: '',
+        quantidade: '1',
+        digital: true,
+      });
+      setMensagem(`Livro "${livro.nome}" cadastrado no catálogo.`);
+    } catch (error) {
+      setErro(error.message);
+    }
+  }
+
+  async function salvarEstoqueAdmin(livro) {
+    setErro('');
+    setMensagem('');
+    try {
+      const atualizado = await apiRequest(`/admin/livros/${livro.id}/estoque`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${sessao.token}` },
+        body: JSON.stringify({
+          quantidade: Number(estoqueAdmin[livro.id] ?? livro.quantidade),
+          disponivel: disponibilidadeAdmin[livro.id] ?? livro.disponivel,
+        }),
+      });
+      setLivros((atuais) => atuais.map((item) => item.id === atualizado.id ? atualizado : item));
+      setEstoqueAdmin((atual) => ({ ...atual, [atualizado.id]: atualizado.quantidade }));
+      setDisponibilidadeAdmin((atual) => ({ ...atual, [atualizado.id]: atualizado.disponivel }));
+      setMensagem(`Estoque de "${livro.nome}" atualizado.`);
+    } catch (error) {
+      setErro(error.message);
+    }
+  }
+
+  async function desativarLivroAdmin(livro) {
+    setErro('');
+    setMensagem('');
+    try {
+      await apiRequest(`/admin/livros/${livro.id}/desativar`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${sessao.token}` },
+      });
+      setLivros((atuais) => atuais.map((item) => (
+        item.id === livro.id ? { ...item, disponivel: false } : item
+      )));
+      setDisponibilidadeAdmin((atual) => ({ ...atual, [livro.id]: false }));
+      setMensagem(`"${livro.nome}" foi desativado no catálogo.`);
     } catch (error) {
       setErro(error.message);
     }
@@ -517,9 +660,11 @@ function App() {
         <nav>
           <a href="#catalogo">Catálogo</a>
           <a href="#conta">{sessao ? 'Minha conta' : 'Entrar'}</a>
-          <button type="button" className="cart-button" onClick={abrirCarrinho}>
-            Carrinho <span>{quantidadeCarrinho}</span>
-          </button>
+          {sessao?.usuario?.tipo !== 'ADMIN' && (
+            <button type="button" className="cart-button" onClick={abrirCarrinho}>
+              Carrinho <span>{quantidadeCarrinho}</span>
+            </button>
+          )}
         </nav>
       </header>
 
@@ -536,39 +681,43 @@ function App() {
           <div id="conta" className="login-card">
             {sessao ? (
               <>
-                <h3>Olá, {sessao.usuario.nome}</h3>
+                <h3>{sessao.usuario.tipo === 'ADMIN' ? 'Painel administrativo' : `Olá, ${sessao.usuario.nome}`}</h3>
                 <p className="account-email">{sessao.usuario.email}</p>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => {
-                    setSecaoPedidos('historico');
-                    setPaginaPedidos(1);
-                    setMostrarHistorico(true);
-                    setLivroSelecionado(null);
-                  }}
-                >
-                  Meu histórico
-                </button>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => {
-                    setSecaoPedidos('alugueis');
-                    setPaginaPedidos(1);
-                    setMostrarHistorico(true);
-                    setLivroSelecionado(null);
-                  }}
-                >
-                  Meus livros alugados
-                </button>
+                {sessao.usuario.tipo !== 'ADMIN' && (
+                  <>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => {
+                        setSecaoPedidos('historico');
+                        setPaginaPedidos(1);
+                        setMostrarHistorico(true);
+                        setLivroSelecionado(null);
+                      }}
+                    >
+                      Meu histórico
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => {
+                        setSecaoPedidos('alugueis');
+                        setPaginaPedidos(1);
+                        setMostrarHistorico(true);
+                        setLivroSelecionado(null);
+                      }}
+                    >
+                      Meus livros alugados
+                    </button>
+                  </>
+                )}
                 <button type="button" onClick={sair}>Sair</button>
               </>
             ) : validandoSessao ? (
               <p>Verificando sua sessão...</p>
             ) : (
               <form onSubmit={autenticar}>
-                <h3>{modoCadastro ? 'Criar conta' : 'Entrar'}</h3>
+                <h3>{modoCadastro ? 'Criar conta' : modoAdmin ? 'Acesso administrativo' : 'Entrar'}</h3>
                 {modoCadastro && (
                   <>
                     <input
@@ -634,17 +783,31 @@ function App() {
                   </div>
                 )}
                 <button type="submit">{modoCadastro ? 'Cadastrar' : 'Entrar'}</button>
-                <button
-                  className="text-button"
-                  type="button"
-                  onClick={() => {
-                    setModoCadastro((atual) => !atual);
-                    setMostrarSenha(false);
-                    setErro('');
-                  }}
-                >
-                  {modoCadastro ? 'Já tenho uma conta' : 'Criar conta'}
-                </button>
+                {!modoAdmin && (
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => {
+                      setModoCadastro((atual) => !atual);
+                      setMostrarSenha(false);
+                      setErro('');
+                    }}
+                  >
+                    {modoCadastro ? 'Já tenho uma conta' : 'Criar conta'}
+                  </button>
+                )}
+                {!modoCadastro && (
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => {
+                      setModoAdmin((atual) => !atual);
+                      setErro('');
+                    }}
+                  >
+                    {modoAdmin ? 'Entrar como cliente' : 'Acesso administrativo'}
+                  </button>
+                )}
               </form>
             )}
           </div>
@@ -656,7 +819,210 @@ function App() {
           </div>
         )}
 
-        {sessao && mostrarHistorico && !livroSelecionado && !carrinhoAberto && (
+        {sessao?.usuario?.tipo === 'ADMIN' && (
+          <section className="admin-dashboard">
+            <div className="admin-heading">
+              <span className="badge">ADMIN</span>
+              <h3>Gerenciar biblioteca</h3>
+              <p>Atualize o catálogo, o estoque, as formas de pagamento e o prazo de aluguel.</p>
+            </div>
+
+            <div className="admin-settings-grid">
+              <form className="admin-card admin-settings" onSubmit={salvarConfiguracoesAdmin}>
+                <h4>Configurações da loja</h4>
+                <label>
+                  Prazo de aluguel (dias)
+                  <input
+                    type="number"
+                    min="1"
+                    max="365"
+                    required
+                    value={configuracao.duracaoAluguelDias}
+                    onChange={(event) => setConfiguracao((atual) => ({
+                      ...atual,
+                      duracaoAluguelDias: Number(event.target.value),
+                    }))}
+                  />
+                </label>
+                <fieldset>
+                  <legend>Formas de pagamento habilitadas</legend>
+                  {[
+                    ['PIX', 'PIX'],
+                    ['CARTAO', 'Cartão'],
+                    ['BOLETO', 'Boleto'],
+                  ].map(([valor, rotulo]) => (
+                    <label className="admin-checkbox" key={valor}>
+                      <input
+                        type="checkbox"
+                        checked={configuracao.formasPagamento.includes(valor)}
+                        onChange={(event) => setConfiguracao((atual) => ({
+                          ...atual,
+                          formasPagamento: event.target.checked
+                            ? [...atual.formasPagamento, valor]
+                            : atual.formasPagamento.filter((forma) => forma !== valor),
+                        }))}
+                      />
+                      {rotulo}
+                    </label>
+                  ))}
+                </fieldset>
+                <button type="submit">Salvar configurações</button>
+              </form>
+
+              <form className="admin-card admin-book-form" onSubmit={cadastrarLivroAdmin}>
+                <h4>Cadastrar livro no catálogo</h4>
+                <div className="admin-form-grid">
+                  <input
+                    name="nome"
+                    placeholder="Título"
+                    required
+                    value={novoLivro.nome}
+                    onChange={(event) => setNovoLivro((atual) => ({ ...atual, nome: event.target.value }))}
+                  />
+                  <input
+                    name="autor"
+                    placeholder="Autor"
+                    required
+                    value={novoLivro.autor}
+                    onChange={(event) => setNovoLivro((atual) => ({ ...atual, autor: event.target.value }))}
+                  />
+                  <input
+                    name="categoria"
+                    placeholder="Categoria"
+                    required
+                    value={novoLivro.categoria}
+                    onChange={(event) => setNovoLivro((atual) => ({ ...atual, categoria: event.target.value }))}
+                  />
+                  <input
+                    name="genero"
+                    placeholder="Gênero"
+                    required
+                    value={novoLivro.genero}
+                    onChange={(event) => setNovoLivro((atual) => ({ ...atual, genero: event.target.value }))}
+                  />
+                  <input
+                    name="editora"
+                    placeholder="Editora"
+                    required
+                    value={novoLivro.editora}
+                    onChange={(event) => setNovoLivro((atual) => ({ ...atual, editora: event.target.value }))}
+                  />
+                  <input
+                    name="numeroPaginas"
+                    type="number"
+                    min="1"
+                    placeholder="Páginas"
+                    required
+                    value={novoLivro.numeroPaginas}
+                    onChange={(event) => setNovoLivro((atual) => ({ ...atual, numeroPaginas: event.target.value }))}
+                  />
+                  <input
+                    name="anoPublicacao"
+                    type="number"
+                    placeholder="Ano de publicação"
+                    required
+                    value={novoLivro.anoPublicacao}
+                    onChange={(event) => setNovoLivro((atual) => ({ ...atual, anoPublicacao: event.target.value }))}
+                  />
+                  <input
+                    name="preco"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Preço"
+                    required
+                    value={novoLivro.preco}
+                    onChange={(event) => setNovoLivro((atual) => ({ ...atual, preco: event.target.value }))}
+                  />
+                  <input
+                    name="quantidade"
+                    type="number"
+                    min="0"
+                    placeholder="Estoque"
+                    required
+                    value={novoLivro.quantidade}
+                    onChange={(event) => setNovoLivro((atual) => ({ ...atual, quantidade: event.target.value }))}
+                  />
+                  <label className="admin-checkbox">
+                    <input
+                      name="digital"
+                      type="checkbox"
+                      checked={novoLivro.digital}
+                      onChange={(event) => setNovoLivro((atual) => ({ ...atual, digital: event.target.checked }))}
+                    />
+                    Livro digital (pode ser alugado)
+                  </label>
+                </div>
+                <textarea
+                  name="sinopse"
+                  placeholder="Sinopse"
+                  rows="3"
+                  value={novoLivro.sinopse}
+                  onChange={(event) => setNovoLivro((atual) => ({ ...atual, sinopse: event.target.value }))}
+                />
+                <button type="submit">Cadastrar livro</button>
+              </form>
+            </div>
+
+            <div className="admin-card admin-inventory">
+              <div className="section-header">
+                <h4>Catálogo e estoque</h4>
+                <span>{livros.length} livro(s)</span>
+              </div>
+              <div className="admin-inventory-list">
+                {livros.map((livro) => (
+                  <div className="admin-inventory-row" key={livro.id}>
+                    <div className="admin-book-name">
+                      <strong>{livro.nome}</strong>
+                      <span>{livro.categoria} · {livro.disponivel ? 'Disponível' : 'Desativado'}</span>
+                    </div>
+                    <label>
+                      Estoque
+                      <input
+                        type="number"
+                        min="0"
+                        value={estoqueAdmin[livro.id] ?? livro.quantidade}
+                        onChange={(event) => setEstoqueAdmin((atual) => ({
+                          ...atual,
+                          [livro.id]: event.target.value,
+                        }))}
+                      />
+                    </label>
+                    <label className="admin-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={disponibilidadeAdmin[livro.id] ?? livro.disponivel}
+                        onChange={(event) => setDisponibilidadeAdmin((atual) => ({
+                          ...atual,
+                          [livro.id]: event.target.checked,
+                        }))}
+                      />
+                      Disponível
+                    </label>
+                    <button type="button" onClick={() => salvarEstoqueAdmin(livro)}>
+                      Atualizar estoque
+                    </button>
+                    {livro.disponivel && (
+                      <button
+                        type="button"
+                        className="admin-secondary-button"
+                        onClick={() => {
+                          if (window.confirm(`Desativar "${livro.nome}" no catálogo?`)) {
+                            desativarLivroAdmin(livro);
+                          }
+                        }}
+                      >
+                        Desativar
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {sessao?.usuario?.tipo === 'CLIENTE' && mostrarHistorico && !livroSelecionado && !carrinhoAberto && (
           <section id="historico" className="history-section">
             <div className="section-header">
               <h3>{secaoPedidos === 'alugueis' ? 'Meus livros alugados' : 'Meu histórico'}</h3>
@@ -686,8 +1052,10 @@ function App() {
                   </p>
                   {pedido.tipo === 'ALUGUEL' && (
                     <p className="rental-deadline">
-                      Prazo do aluguel: 14 dias
-                      {pedido.dataFimAluguel ? ` · até ${pedido.dataFimAluguel}` : ''}
+                      Prazo do aluguel
+                      {pedido.dataFimAluguel
+                        ? ` · até ${pedido.dataFimAluguel}`
+                        : ` · ${configuracao.duracaoAluguelDias} dias`}
                     </p>
                   )}
                   <ul>
@@ -749,7 +1117,7 @@ function App() {
           </section>
         )}
 
-        {carrinhoAberto ? (
+        {sessao?.usuario?.tipo === 'ADMIN' ? null : carrinhoAberto ? (
           <section className="cart-page">
             <div className="cart-page-heading">
               <div>
@@ -821,9 +1189,11 @@ function App() {
                   <label className="payment-choice">
                     Forma de pagamento
                     <select value={pagamento} onChange={(event) => setPagamento(event.target.value)}>
-                      <option value="PIX">PIX</option>
-                      <option value="CARTAO">Cartão</option>
-                      <option value="BOLETO">Boleto</option>
+                      {configuracao.formasPagamento.map((forma) => (
+                        <option value={forma} key={forma}>
+                          {forma === 'CARTAO' ? 'Cartão' : forma}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <button
@@ -875,10 +1245,10 @@ function App() {
                   </p>
                   {livroSelecionado.pedido.tipo === 'ALUGUEL' && (
                     <p className="rental-deadline">
-                      Aluguel por 14 dias
+                      Prazo do aluguel
                       {livroSelecionado.pedido.dataFimAluguel
-                        ? ` · prazo até ${livroSelecionado.pedido.dataFimAluguel}`
-                        : ''}
+                        ? ` · até ${livroSelecionado.pedido.dataFimAluguel}`
+                        : ` · ${configuracao.duracaoAluguelDias} dias`}
                     </p>
                   )}
                   {livroSelecionado.pedido.tipo === 'COMPRA'
@@ -948,10 +1318,12 @@ function App() {
                     disabled={!livroSelecionado.livro.disponivel}
                     onClick={() => criarPedido(livroSelecionado.livro, 'ALUGUEL')}
                   >
-                    Alugar por 14 dias
+                    Alugar por {configuracao.duracaoAluguelDias} dias
                   </button>
                 )}
-                <p className="checkout-hint">Aluguel digital disponível por 14 dias.</p>
+                <p className="checkout-hint">
+                  Aluguel digital disponível por {configuracao.duracaoAluguelDias} dias.
+                </p>
               </aside>
             </div>
           </section>

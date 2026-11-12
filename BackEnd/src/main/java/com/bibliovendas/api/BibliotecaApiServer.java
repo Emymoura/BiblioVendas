@@ -1,6 +1,7 @@
 package com.bibliovendas.api;
 
 import com.bibliovendas.model.Boleto;
+import com.bibliovendas.model.Administrador;
 import com.bibliovendas.model.Avaliacao;
 import com.bibliovendas.model.Cartao;
 import com.bibliovendas.model.Cliente;
@@ -9,6 +10,7 @@ import com.bibliovendas.model.Pagamento;
 import com.bibliovendas.model.Pedido;
 import com.bibliovendas.model.Pix;
 import com.bibliovendas.model.TipoPedido;
+import com.bibliovendas.model.Usuario;
 import com.bibliovendas.persistence.PersistenceException;
 import com.bibliovendas.service.BibliotecaService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -39,7 +41,7 @@ public class BibliotecaApiServer implements AutoCloseable {
     private static final int MAX_REQUEST_BYTES = 64 * 1024;
     private final BibliotecaService service;
     private final ObjectMapper json = new ObjectMapper();
-    private final Map<String, Cliente> sessoes = new ConcurrentHashMap<>();
+    private final Map<String, Usuario> sessoes = new ConcurrentHashMap<>();
     private final HttpServer server;
 
     public BibliotecaApiServer(BibliotecaService service, int port) throws IOException {
@@ -68,7 +70,7 @@ public class BibliotecaApiServer implements AutoCloseable {
 
     private void handle(HttpExchange exchange) throws IOException {
         exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
         exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization");
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
 
@@ -91,8 +93,23 @@ public class BibliotecaApiServer implements AutoCloseable {
                 cadastrarCliente(exchange);
             } else if ("POST".equals(method) && "/api/auth/login".equals(path)) {
                 login(exchange);
+            } else if ("POST".equals(method) && "/api/admin/login".equals(path)) {
+                loginAdministrador(exchange);
             } else if ("GET".equals(method) && "/api/auth/session".equals(path)) {
                 validarSessao(exchange);
+            } else if ("GET".equals(method) && "/api/configuracoes".equals(path)) {
+                responder(exchange, 200, configuracoesJson());
+            } else if ("/api/admin/configuracoes".equals(path) && "GET".equals(method)) {
+                administradorAutenticado(exchange);
+                responder(exchange, 200, configuracoesJson());
+            } else if ("/api/admin/configuracoes".equals(path) && "PUT".equals(method)) {
+                atualizarConfiguracoes(exchange);
+            } else if ("POST".equals(method) && "/api/admin/livros".equals(path)) {
+                cadastrarLivroAdministrador(exchange);
+            } else if ("PUT".equals(method) && isRotaEstoqueAdmin(path)) {
+                atualizarEstoqueAdministrador(exchange, path);
+            } else if ("POST".equals(method) && isRotaDesativarAdmin(path)) {
+                desativarLivroAdministrador(exchange, path);
             } else if ("POST".equals(method) && "/api/pedidos".equals(path)) {
                 criarPedido(exchange);
             } else if ("GET".equals(method) && "/api/pedidos".equals(path)) {
@@ -112,6 +129,8 @@ public class BibliotecaApiServer implements AutoCloseable {
             responder(exchange, 409, erro(ex.getMessage()));
         } catch (SecurityException ex) {
             responder(exchange, 401, erro(ex.getMessage()));
+        } catch (AuthorizationException ex) {
+            responder(exchange, 403, erro(ex.getMessage()));
         } catch (PersistenceException ex) {
             if (isConstraintViolation(ex)) {
                 responder(exchange, 409, erro("Já existe um cadastro com esses dados."));
@@ -174,9 +193,113 @@ public class BibliotecaApiServer implements AutoCloseable {
         responder(exchange, 200, sessaoJson(cliente));
     }
 
+    private void loginAdministrador(HttpExchange exchange) throws IOException {
+        JsonNode corpo = lerCorpo(exchange);
+        String email = textoObrigatorio(corpo, "email");
+        String senha = textoObrigatorio(corpo, "senha");
+        Administrador administrador = service.loginAdministrador(email, senha)
+                .orElseThrow(() -> new SecurityException("E-mail ou senha administrativos inválidos."));
+        responder(exchange, 200, sessaoJson(administrador));
+    }
+
+    private void atualizarConfiguracoes(HttpExchange exchange) throws IOException {
+        administradorAutenticado(exchange);
+        JsonNode corpo = lerCorpo(exchange);
+        int duracao = inteiroObrigatorio(corpo, "duracaoAluguelDias");
+        JsonNode formas = corpo.get("formasPagamento");
+        if (formas == null || !formas.isArray()) {
+            throw new IllegalArgumentException("Informe as formas de pagamento ativas.");
+        }
+        List<String> metodos = new java.util.ArrayList<>();
+        for (JsonNode forma : formas) {
+            if (!forma.isTextual()) {
+                throw new IllegalArgumentException("As formas de pagamento devem ser textos.");
+            }
+            metodos.add(forma.asText());
+        }
+        service.atualizarConfiguracoes(duracao, metodos);
+        responder(exchange, 200, configuracoesJson());
+    }
+
+    private void cadastrarLivroAdministrador(HttpExchange exchange) throws IOException {
+        administradorAutenticado(exchange);
+        JsonNode corpo = lerCorpo(exchange);
+        String nome = textoObrigatorio(corpo, "nome");
+        String sinopse = textoOpcional(corpo, "sinopse");
+        String categoria = textoObrigatorio(corpo, "categoria");
+        String genero = textoObrigatorio(corpo, "genero");
+        String autor = textoObrigatorio(corpo, "autor");
+        String editora = textoObrigatorio(corpo, "editora");
+        int paginas = inteiroObrigatorio(corpo, "numeroPaginas");
+        int ano = inteiroObrigatorio(corpo, "anoPublicacao");
+        BigDecimal preco = decimalObrigatorio(corpo, "preco");
+        int quantidade = inteiroObrigatorio(corpo, "quantidade");
+        boolean disponivel = booleanoObrigatorio(corpo, "disponivel");
+        boolean digital = booleanoObrigatorio(corpo, "digital");
+        if (paginas < 1 || quantidade < 0 || preco.signum() < 0) {
+            throw new IllegalArgumentException("Preço e quantidade não podem ser negativos; páginas devem ser positivas.");
+        }
+        Livro livro = service.cadastrarLivro(nome, sinopse, categoria, genero, autor,
+                editora, paginas, ano, preco, quantidade, disponivel, digital);
+        responder(exchange, 201, livroJson(livro));
+    }
+
+    private void atualizarEstoqueAdministrador(HttpExchange exchange, String path) throws IOException {
+        administradorAutenticado(exchange);
+        long livroId = idDaRotaAdmin(path, "/estoque");
+        JsonNode corpo = lerCorpo(exchange);
+        int quantidade = inteiroObrigatorio(corpo, "quantidade");
+        boolean disponivel = booleanoObrigatorio(corpo, "disponivel");
+        service.atualizarEstoqueLivro(livroId, quantidade, disponivel);
+        Livro livro = service.buscarLivro(livroId)
+                .orElseThrow(() -> new IllegalArgumentException("Livro não encontrado."));
+        responder(exchange, 200, livroJson(livro));
+    }
+
+    private void desativarLivroAdministrador(HttpExchange exchange, String path) throws IOException {
+        administradorAutenticado(exchange);
+        long livroId = idDaRotaAdmin(path, "/desativar");
+        service.removerOuDesativarLivro(livroId, false);
+        responder(exchange, 200, json.createObjectNode()
+                .put("livroId", livroId)
+                .put("disponivel", false));
+    }
+
+    private ObjectNode configuracoesJson() {
+        ArrayNode formas = json.createArrayNode();
+        service.getFormasPagamento().forEach(formas::add);
+        return json.createObjectNode()
+                .put("duracaoAluguelDias", service.getDuracaoAluguelDias())
+                .set("formasPagamento", formas);
+    }
+
+    private boolean isRotaEstoqueAdmin(String path) {
+        return path.startsWith("/api/admin/livros/")
+                && path.endsWith("/estoque");
+    }
+
+    private boolean isRotaDesativarAdmin(String path) {
+        return path.startsWith("/api/admin/livros/")
+                && path.endsWith("/desativar");
+    }
+
+    private long idDaRotaAdmin(String path, String sufixo) {
+        String identificador = path.substring("/api/admin/livros/".length(),
+                path.length() - sufixo.length());
+        try {
+            long id = Long.parseLong(identificador);
+            if (id < 1) {
+                throw new NumberFormatException();
+            }
+            return id;
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("O identificador do livro é inválido.");
+        }
+    }
+
     private void validarSessao(HttpExchange exchange) throws IOException {
-        Cliente cliente = clienteAutenticado(exchange);
-        responder(exchange, 200, json.createObjectNode().set("usuario", usuarioJson(cliente)));
+        Usuario usuario = usuarioAutenticado(exchange);
+        responder(exchange, 200, json.createObjectNode().set("usuario", usuarioJson(usuario)));
     }
 
     private void criarPedido(HttpExchange exchange) throws IOException {
@@ -201,6 +324,9 @@ public class BibliotecaApiServer implements AutoCloseable {
             total = total.add(livro.getPreco().multiply(BigDecimal.valueOf(item.getValue())));
         }
         String metodo = textoObrigatorio(corpo, "pagamento").toUpperCase();
+        if (!service.getFormasPagamento().contains(metodo)) {
+            throw new IllegalArgumentException("Esta forma de pagamento não está habilitada.");
+        }
         Pagamento pagamento = criarPagamento(metodo, total, cliente);
 
         Pedido pedido;
@@ -368,32 +494,48 @@ public class BibliotecaApiServer implements AutoCloseable {
         throw new IllegalArgumentException("O pagamento deve ser PIX, CARTAO ou BOLETO.");
     }
 
-    private ObjectNode sessaoJson(Cliente cliente) {
+    private ObjectNode sessaoJson(Usuario usuario) {
         String token = UUID.randomUUID().toString();
-        sessoes.put(token, cliente);
+        sessoes.put(token, usuario);
         return json.createObjectNode()
                 .put("token", token)
-                .set("usuario", usuarioJson(cliente));
+                .set("usuario", usuarioJson(usuario));
     }
 
-    private ObjectNode usuarioJson(Cliente cliente) {
-        ObjectNode usuario = json.createObjectNode()
-                .put("id", cliente.getId())
-                .put("nome", cliente.getNome())
-                .put("email", cliente.getEmail());
-        return usuario;
+    private ObjectNode usuarioJson(Usuario usuario) {
+        return json.createObjectNode()
+                .put("id", usuario.getId())
+                .put("nome", usuario.getNome())
+                .put("email", usuario.getEmail())
+                .put("tipo", usuario instanceof Administrador ? "ADMIN" : "CLIENTE");
     }
 
     private Cliente clienteAutenticado(HttpExchange exchange) {
+        Usuario usuario = usuarioAutenticado(exchange);
+        if (!(usuario instanceof Cliente)) {
+            throw new AuthorizationException("Esta operação está disponível somente para clientes.");
+        }
+        return (Cliente) usuario;
+    }
+
+    private Administrador administradorAutenticado(HttpExchange exchange) {
+        Usuario usuario = usuarioAutenticado(exchange);
+        if (!(usuario instanceof Administrador)) {
+            throw new AuthorizationException("Acesso restrito ao administrador.");
+        }
+        return (Administrador) usuario;
+    }
+
+    private Usuario usuarioAutenticado(HttpExchange exchange) {
         String autorizacao = exchange.getRequestHeaders().getFirst("Authorization");
         if (autorizacao == null || !autorizacao.startsWith("Bearer ")) {
             throw new SecurityException("Autenticação necessária.");
         }
-        Cliente cliente = sessoes.get(autorizacao.substring("Bearer ".length()).trim());
-        if (cliente == null) {
+        Usuario usuario = sessoes.get(autorizacao.substring("Bearer ".length()).trim());
+        if (usuario == null) {
             throw new SecurityException("Sessão inválida ou expirada. Faça login novamente.");
         }
-        return cliente;
+        return usuario;
     }
 
     private ObjectNode livroJson(Livro livro) {
@@ -501,6 +643,22 @@ public class BibliotecaApiServer implements AutoCloseable {
         return (int) numero;
     }
 
+    private BigDecimal decimalObrigatorio(JsonNode corpo, String campo) {
+        JsonNode valor = corpo.get(campo);
+        if (valor == null || !valor.isNumber()) {
+            throw new IllegalArgumentException("O campo '" + campo + "' deve ser um número.");
+        }
+        return valor.decimalValue();
+    }
+
+    private boolean booleanoObrigatorio(JsonNode corpo, String campo) {
+        JsonNode valor = corpo.get(campo);
+        if (valor == null || !valor.isBoolean()) {
+            throw new IllegalArgumentException("O campo '" + campo + "' deve ser verdadeiro ou falso.");
+        }
+        return valor.asBoolean();
+    }
+
     private String parametroConsulta(HttpExchange exchange, String nome) throws IOException {
         String query = exchange.getRequestURI().getRawQuery();
         if (query == null) {
@@ -532,5 +690,11 @@ public class BibliotecaApiServer implements AutoCloseable {
         return causa instanceof SQLException
                 && ((SQLException) causa).getSQLState() != null
                 && ((SQLException) causa).getSQLState().startsWith("23");
+    }
+
+    private static final class AuthorizationException extends RuntimeException {
+        private AuthorizationException(String mensagem) {
+            super(mensagem);
+        }
     }
 }

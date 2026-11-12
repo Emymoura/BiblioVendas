@@ -1,6 +1,7 @@
 package com.bibliovendas.persistence;
 
 import com.bibliovendas.model.Avaliacao;
+import com.bibliovendas.model.Administrador;
 import com.bibliovendas.model.Boleto;
 import com.bibliovendas.model.Cartao;
 import com.bibliovendas.model.Cliente;
@@ -49,6 +50,27 @@ public class MySqlBibliotecaRepository {
         return (PrestadorServico) cadastrarUsuario(nome, email, senha, endereco, "PRESTADOR");
     }
 
+    public void garantirAdministrador(String nome, String email, String senha) {
+        Optional<Usuario> administrador = buscarUsuarioPorEmail(email, "ADMIN");
+        if (administrador.isPresent()) {
+            return;
+        }
+        try (Connection connection = database.conectar();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT tipo FROM usuarios WHERE LOWER(email) = LOWER(?)")) {
+            statement.setString(1, email);
+            try (ResultSet result = statement.executeQuery()) {
+                if (result.next()) {
+                    throw new IllegalStateException(
+                            "O e-mail configurado para ADMIN já pertence a outro perfil.");
+                }
+            }
+        } catch (SQLException ex) {
+            throw erro("Não foi possível verificar a conta administrativa.", ex);
+        }
+        cadastrarUsuario(nome, email, senha, "Administração", "ADMIN");
+    }
+
     private Usuario cadastrarUsuario(String nome, String email, String senha, String endereco, String tipo) {
         String sql = "INSERT INTO usuarios (nome, email, senha_hash, endereco, tipo) VALUES (?, ?, ?, ?, ?)";
         String senhaHash = SenhaUtil.gerarHash(senha);
@@ -82,6 +104,12 @@ public class MySqlBibliotecaRepository {
         return buscarUsuarioPorEmail(email, "PRESTADOR")
                 .filter(usuario -> usuario.autenticar(senha))
                 .map(usuario -> (PrestadorServico) usuario);
+    }
+
+    public Optional<Administrador> loginAdministrador(String email, String senha) {
+        return buscarUsuarioPorEmail(email, "ADMIN")
+                .filter(usuario -> usuario.autenticar(senha))
+                .map(usuario -> (Administrador) usuario);
     }
 
     public Optional<Usuario> buscarUsuarioPorEmail(String email, String tipo) {
@@ -206,14 +234,96 @@ public class MySqlBibliotecaRepository {
         executarAtualizacao("UPDATE livros SET disponivel = FALSE WHERE id = ?", livroId, "Livro não encontrado.");
     }
 
+    public void atualizarEstoqueLivro(Long livroId, int quantidade, boolean disponivel) {
+        try (Connection connection = database.conectar()) {
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement localizar = connection.prepareStatement(
+                        "SELECT id FROM livros WHERE id = ? FOR UPDATE")) {
+                    localizar.setLong(1, livroId);
+                    try (ResultSet result = localizar.executeQuery()) {
+                        if (!result.next()) {
+                            throw new IllegalArgumentException("Livro não encontrado.");
+                        }
+                    }
+                }
+                try (PreparedStatement atualizar = connection.prepareStatement(
+                        "UPDATE livros SET quantidade = ?, disponivel = ? WHERE id = ?")) {
+                    atualizar.setInt(1, quantidade);
+                    atualizar.setBoolean(2, disponivel && quantidade > 0);
+                    atualizar.setLong(3, livroId);
+                    atualizar.executeUpdate();
+                }
+                connection.commit();
+            } catch (SQLException | RuntimeException ex) {
+                connection.rollback();
+                throw ex;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException ex) {
+            throw erro("Não foi possível atualizar o estoque do livro.", ex);
+        }
+    }
+
+    public String obterConfiguracao(String chave, String padrao) {
+        String sql = "SELECT valor FROM configuracoes_sistema WHERE chave = ?";
+        try (Connection connection = database.conectar();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, chave);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? result.getString("valor") : padrao;
+            }
+        } catch (SQLException ex) {
+            throw erro("Não foi possível carregar as configurações do sistema.", ex);
+        }
+    }
+
+    public void salvarConfiguracoes(int duracaoAluguelDias, String formasPagamento) {
+        String sql = "INSERT INTO configuracoes_sistema (chave, valor) VALUES (?, ?) "
+                + "ON DUPLICATE KEY UPDATE valor = VALUES(valor)";
+        try (Connection connection = database.conectar()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, "duracao_aluguel_dias");
+                statement.setString(2, String.valueOf(duracaoAluguelDias));
+                statement.addBatch();
+                statement.setString(1, "formas_pagamento");
+                statement.setString(2, formasPagamento);
+                statement.addBatch();
+                statement.executeBatch();
+                connection.commit();
+            } catch (SQLException | RuntimeException ex) {
+                connection.rollback();
+                throw ex;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        } catch (SQLException ex) {
+            throw erro("Não foi possível salvar as configurações do sistema.", ex);
+        }
+    }
+
     public Pedido registrarPedido(Cliente cliente, Livro livro, int quantidade, Pagamento pagamento,
                                  TipoPedido tipoPedido, StatusPedido status) {
         return registrarPedido(cliente, Collections.singletonList(new ItemPedido(livro, quantidade)),
-                pagamento, tipoPedido, status);
+                pagamento, tipoPedido, status, Pedido.DURACAO_ALUGUEL_DIAS);
+    }
+
+    public Pedido registrarPedido(Cliente cliente, Livro livro, int quantidade, Pagamento pagamento,
+                                 TipoPedido tipoPedido, StatusPedido status, int duracaoAluguelDias) {
+        return registrarPedido(cliente, Collections.singletonList(new ItemPedido(livro, quantidade)),
+                pagamento, tipoPedido, status, duracaoAluguelDias);
     }
 
     public Pedido registrarPedido(Cliente cliente, List<ItemPedido> itens, Pagamento pagamento,
                                  TipoPedido tipoPedido, StatusPedido status) {
+        return registrarPedido(cliente, itens, pagamento, tipoPedido, status,
+                Pedido.DURACAO_ALUGUEL_DIAS);
+    }
+
+    public Pedido registrarPedido(Cliente cliente, List<ItemPedido> itens, Pagamento pagamento,
+                                 TipoPedido tipoPedido, StatusPedido status, int duracaoAluguelDias) {
         if (itens == null || itens.isEmpty()) {
             throw new IllegalArgumentException("O pedido precisa ter ao menos um livro.");
         }
@@ -256,7 +366,7 @@ public class MySqlBibliotecaRepository {
                     pedido.setBigDecimal(5, pagamento.getValor());
                     if (tipoPedido == TipoPedido.ALUGUEL) {
                         pedido.setDate(6, java.sql.Date.valueOf(
-                                LocalDate.now().plusDays(Pedido.DURACAO_ALUGUEL_DIAS)));
+                                    LocalDate.now().plusDays(duracaoAluguelDias)));
                     } else {
                         pedido.setNull(6, java.sql.Types.DATE);
                     }
@@ -291,12 +401,14 @@ public class MySqlBibliotecaRepository {
                     }
                 }
 
-                Pedido resultado = new Pedido(pedidoId, cliente, tipoPedido, pagamento);
+                LocalDate data = LocalDate.now();
+                Pedido resultado = new Pedido(pedidoId, cliente, tipoPedido, pagamento,
+                        data, status, tipoPedido == TipoPedido.ALUGUEL
+                                ? data.plusDays(duracaoAluguelDias) : null);
                 for (ItemPedido item : itens) {
                     resultado.adicionarItem(item.getLivro(), item.getQuantidade(),
                             item.getNomeLivro(), item.getPrecoUnitario());
                 }
-                resultado.setStatus(status);
                 cliente.adicionarPedido(resultado);
                 return resultado;
             } catch (SQLException | RuntimeException ex) {
@@ -670,6 +782,9 @@ public class MySqlBibliotecaRepository {
 
     private Usuario criarUsuario(Long id, String nome, String email, String senhaHash,
                                  String endereco, String tipo) {
+        if ("ADMIN".equals(tipo)) {
+            return new Administrador(id, nome, email, senhaHash, endereco, true);
+        }
         if ("CLIENTE".equals(tipo)) {
             return new Cliente(id, nome, email, senhaHash, endereco, true);
         }

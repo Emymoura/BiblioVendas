@@ -29,6 +29,12 @@ public class Pedido {
     }
 
     public Pedido(Long id, Cliente cliente, TipoPedido tipoPedido, Pagamento pagamento,
+                  LocalDate data, StatusPedido status, int duracaoAluguelDias) {
+        this(id, cliente, tipoPedido, pagamento, data, status,
+                tipoPedido == TipoPedido.ALUGUEL ? data.plusDays(duracaoAluguelDias) : null);
+    }
+
+    public Pedido(Long id, Cliente cliente, TipoPedido tipoPedido, Pagamento pagamento,
                   LocalDate data, StatusPedido status, LocalDate dataFimAluguel) {
         this.id = id;
         this.cliente = cliente;

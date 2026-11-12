@@ -14,6 +14,17 @@ $env:BIBLIO_DB_USER = "seu-usuario"
 $env:BIBLIO_DB_PASSWORD = "sua-senha"
 ```
 
+Para criar o primeiro administrador, configure estas variáveis antes de iniciar a API. A conta é criada uma única vez; não existe cadastro público de ADMIN:
+
+```powershell
+$env:BIBLIO_ADMIN_EMAIL = "admin@admin.com"
+$env:BIBLIO_ADMIN_PASSWORD = "Use-Uma-Senha-Forte-123!"
+```
+
+Use uma senha exclusiva com pelo menos 8 caracteres, maiúscula, número e símbolo. O backend armazena somente o hash PBKDF2. Se o e-mail já pertencer a um perfil que não seja ADMIN, a inicialização não o promoverá.
+
+Na instalação local de demonstração, o e-mail ADMIN é `admin@admin.com`. A senha real não é registrada no README nem no repositório. As variáveis acima são usadas somente para criar o primeiro administrador; alterar essas variáveis não redefine uma conta já existente.
+
 Opcionalmente, use Docker na pasta `BackEnd`:
 
 ```powershell
@@ -42,7 +53,14 @@ A API fica em `http://127.0.0.1:8080/api` e permanece ativa até encerrar o proc
 - `GET /api/livros/{id}` — detalhes de um livro
 - `POST /api/clientes` — cadastro (`nome`, `email`, `senha`, `endereco`); exige 8 caracteres, maiúscula, número e caractere especial; retorna token
 - `POST /api/auth/login` — login (`email`, `senha`); retorna token de sessão
+- `POST /api/admin/login` — login administrativo; retorna token com perfil `ADMIN`
 - `GET /api/auth/session` — valida a sessão autenticada
+- `GET /api/configuracoes` — formas de pagamento habilitadas e prazo atual de aluguel
+- `GET /api/admin/configuracoes` — configurações da loja, somente ADMIN
+- `PUT /api/admin/configuracoes` — atualiza `duracaoAluguelDias` (1 a 365) e `formasPagamento` (PIX, CARTAO, BOLETO)
+- `POST /api/admin/livros` — cadastra um livro no catálogo
+- `PUT /api/admin/livros/{id}/estoque` — atualiza quantidade e disponibilidade
+- `POST /api/admin/livros/{id}/desativar` — desativa um livro sem apagar pedidos anteriores
 - `GET /api/pedidos` — histórico completo do cliente autenticado
 - `GET /api/pedidos?pagina=1&limite=5&tipo=ALUGUEL` — página de pedidos; `tipo` também aceita `COMPRA`
 - `POST /api/pedidos` — compra com vários itens (`itens: [{livroId, quantidade}]`, `tipo: "COMPRA"`, `pagamento`) ou aluguel de um livro (`livroId`, `quantidade: 1`, `tipo: "ALUGUEL"`, `pagamento`); o formato antigo de item único continua aceito
@@ -50,9 +68,9 @@ A API fica em `http://127.0.0.1:8080/api` e permanece ativa até encerrar o proc
 - `GET /api/avaliacoes?livroId=1` — avaliações de um livro ou do catálogo inteiro
 - `POST /api/avaliacoes` — avaliação autenticada (`livroId`, `nota`, `comentario`); exige compra ou aluguel
 
-Pedidos e avaliações exigem o cabeçalho `Authorization: Bearer <token>`. Sessões ficam em memória e expiram ao reiniciar a API. As avaliações iniciais são identificadas como demonstrativas. Os pagamentos são simulados; nenhuma cobrança é enviada a uma operadora. O Vite encaminha `/api` ao backend durante o desenvolvimento.
+Pedidos, avaliações e operações administrativas exigem o cabeçalho `Authorization: Bearer <token>`. Rotas administrativas verificam o perfil no backend; contas de clientes não podem utilizá-las. Sessões ficam em memória e expiram ao reiniciar a API. As avaliações iniciais são identificadas como demonstrativas. Os pagamentos são simulados; nenhuma cobrança é enviada a uma operadora. O Vite encaminha `/api` ao backend durante o desenvolvimento.
 
-Aluguéis são exclusivos por cliente e livro enquanto ativos, duram 14 dias e exibem a data de vencimento no histórico e na página "Meus livros alugados". O backend migra automaticamente os pedidos antigos para salvar os nomes históricos dos livros e as datas de vencimento.
+Aluguéis são exclusivos por cliente e livro enquanto ativos e usam o prazo configurado pelo ADMIN (14 dias por padrão). A data de vencimento aparece no histórico e na página "Meus livros alugados". O backend migra automaticamente os pedidos antigos para salvar os nomes históricos dos livros e as datas de vencimento.
 
 ## Estrutura
 
