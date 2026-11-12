@@ -288,6 +288,139 @@ nav a {
   background: rgba(13, 25, 38, 0.9);
 }
 
+.admin-dashboard {
+  display: grid;
+  gap: 20px;
+}
+
+.admin-heading h3,
+.admin-heading p {
+  margin: 0;
+}
+
+.admin-heading h3 {
+  font-size: 1.7rem;
+}
+
+.admin-heading p {
+  color: #cfe1f7;
+}
+
+.admin-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.8fr) minmax(0, 1.4fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.admin-card {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid rgba(127, 236, 232, 0.18);
+  border-radius: 16px;
+  background: rgba(13, 25, 38, 0.9);
+}
+
+.admin-card h4 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.admin-card input:not([type="checkbox"]),
+.admin-card textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #2d4d69;
+  border-radius: 9px;
+  background: #0f2032;
+  color: white;
+}
+
+.admin-settings > label {
+  display: grid;
+  gap: 6px;
+  color: #d0e3f8;
+}
+
+.admin-settings fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+.admin-settings legend {
+  padding: 0 6px;
+  color: #d0e3f8;
+}
+
+.admin-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #d0e3f8;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-inventory .section-header h4 {
+  margin: 0;
+}
+
+.admin-inventory-list {
+  display: grid;
+}
+
+.admin-inventory-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 100px auto auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.admin-book-name {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-book-name span {
+  color: #9db5ca;
+  font-size: 0.8rem;
+}
+
+.admin-inventory-row label:not(.admin-checkbox) {
+  display: grid;
+  gap: 4px;
+  color: #9db5ca;
+  font-size: 0.78rem;
+}
+
+.admin-dashboard button {
+  border: 0;
+  border-radius: 9px;
+  padding: 9px 12px;
+  background: linear-gradient(135deg, #4dd7ce, #3e8db7);
+  color: #032230;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-dashboard .admin-secondary-button {
+  border: 1px solid rgba(255, 132, 132, 0.5);
+  background: transparent;
+  color: #ffb6b6;
+}
+
 .history-section h3 {
   margin: 0;
   font-size: 1.5rem;
@@ -838,8 +971,18 @@ nav a {
   }
 
   .product-layout,
-  .cart-layout {
+  .cart-layout,
+  .admin-settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-inventory-row {
+    grid-template-columns: 1fr 100px;
+  }
+
+  .admin-inventory-row .admin-checkbox,
+  .admin-inventory-row button {
+    grid-column: span 2;
   }
 
   .book-cover-large {

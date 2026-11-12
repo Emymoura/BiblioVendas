@@ -97,6 +97,61 @@ class BibliotecaApiServerTest {
     }
 
     @Test
+    void devePermitirQueAdministradorConfigureLojaSemLiberarAcessoAClientes() throws Exception {
+        service.garantirAdministrador("Admin", "admin@example.test", "Admin123!");
+        Response loginAdmin = request("POST", "/api/admin/login", null,
+                "{\"email\":\"admin@example.test\",\"senha\":\"Admin123!\"}");
+        String tokenAdmin = loginAdmin.body.get("token").asText();
+
+        assertEquals(200, loginAdmin.status);
+        assertEquals("ADMIN", loginAdmin.body.get("usuario").get("tipo").asText());
+        Response atualizar = request("PUT", "/api/admin/configuracoes", tokenAdmin,
+                "{\"duracaoAluguelDias\":30,\"formasPagamento\":[\"PIX\"]}");
+        assertEquals(200, atualizar.status);
+        assertEquals(30, atualizar.body.get("duracaoAluguelDias").asInt());
+        assertEquals("PIX", atualizar.body.get("formasPagamento").get(0).asText());
+
+        Response cadastro = request("POST", "/api/clientes", null,
+                "{\"nome\":\"Ana\",\"email\":\"cliente-admin@example.test\",\"senha\":\"Senha123!\",\"endereco\":\"Centro\"}");
+        String tokenCliente = cadastro.body.get("token").asText();
+        Response acessoNegado = request("GET", "/api/admin/configuracoes", tokenCliente, null);
+        Response tentativaPagamentoDesabilitado = request("POST", "/api/pedidos", tokenCliente,
+                "{\"livroId\":1,\"quantidade\":1,\"tipo\":\"ALUGUEL\",\"pagamento\":\"BOLETO\"}");
+        Response aluguel = request("POST", "/api/pedidos", tokenCliente,
+                "{\"livroId\":1,\"quantidade\":1,\"tipo\":\"ALUGUEL\",\"pagamento\":\"PIX\"}");
+        Response operacaoClienteAdmin = request("POST", "/api/admin/livros", tokenCliente, "{}");
+
+        assertEquals(403, acessoNegado.status);
+        assertEquals(400, tentativaPagamentoDesabilitado.status);
+        assertEquals(201, aluguel.status);
+        assertEquals(java.time.LocalDate.now().plusDays(30).toString(),
+                aluguel.body.get("dataFimAluguel").asText());
+        assertEquals(403, operacaoClienteAdmin.status);
+    }
+
+    @Test
+    void administradorPodeCadastrarLivrosEAtualizarEstoque() throws Exception {
+        service.garantirAdministrador("Admin", "catalogo-admin@example.test", "Admin123!");
+        Response login = request("POST", "/api/admin/login", null,
+                "{\"email\":\"catalogo-admin@example.test\",\"senha\":\"Admin123!\"}");
+        String token = login.body.get("token").asText();
+        Response novoLivro = request("POST", "/api/admin/livros", token,
+                "{\"nome\":\"Livro novo\",\"sinopse\":\"Sinopse\",\"categoria\":\"Tecnologia\","
+                        + "\"genero\":\"Programação\",\"autor\":\"Autora\",\"editora\":\"Editora\","
+                        + "\"numeroPaginas\":150,\"anoPublicacao\":2026,\"preco\":45.50,"
+                        + "\"quantidade\":3,\"disponivel\":true,\"digital\":true}");
+        long livroId = novoLivro.body.get("id").asLong();
+
+        Response estoque = request("PUT", "/api/admin/livros/" + livroId + "/estoque", token,
+                "{\"quantidade\":8,\"disponivel\":false}");
+
+        assertEquals(201, novoLivro.status);
+        assertEquals(200, estoque.status);
+        assertEquals(8, estoque.body.get("quantidade").asInt());
+        assertEquals(false, estoque.body.get("disponivel").asBoolean());
+    }
+
+    @Test
     void naoDevePermitirAvaliacaoSemCompraOuAluguel() throws Exception {
         Response cadastro = request("POST", "/api/clientes", null,
                 "{\"nome\":\"Ana\",\"email\":\"sem-pedido@example.test\",\"senha\":\"Senha123!\",\"endereco\":\"Centro\"}");

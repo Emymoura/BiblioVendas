@@ -71,6 +71,19 @@ CREATE TABLE IF NOT EXISTS cartoes_cliente (
     CONSTRAINT fk_cartoes_cliente FOREIGN KEY (cliente_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS configuracoes_sistema (
+    chave VARCHAR(80) NOT NULL PRIMARY KEY,
+    valor VARCHAR(500) NOT NULL
+);
+
+INSERT INTO configuracoes_sistema (chave, valor)
+VALUES ('duracao_aluguel_dias', '14')
+ON DUPLICATE KEY UPDATE chave = VALUES(chave);
+
+INSERT INTO configuracoes_sistema (chave, valor)
+VALUES ('formas_pagamento', 'PIX,CARTAO,BOLETO')
+ON DUPLICATE KEY UPDATE chave = VALUES(chave);
+
 INSERT INTO livros (
     nome, sinopse, categoria, genero, autor, editora,
     numero_paginas, ano_publicacao, preco, quantidade, disponivel, digital

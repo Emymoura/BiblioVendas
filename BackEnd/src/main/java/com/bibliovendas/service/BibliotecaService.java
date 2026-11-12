@@ -1,6 +1,7 @@
 package com.bibliovendas.service;
 
 import com.bibliovendas.model.Avaliacao;
+import com.bibliovendas.model.Administrador;
 import com.bibliovendas.model.Cartao;
 import com.bibliovendas.model.Catalogo;
 import com.bibliovendas.model.Cliente;
@@ -25,15 +26,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 public class BibliotecaService {
     private final Map<Long, Cliente> clientes = new HashMap<>();
     private final Map<Long, PrestadorServico> prestadores = new HashMap<>();
+    private final Map<Long, Administrador> administradores = new HashMap<>();
     private final Catalogo catalogo = new Catalogo();
     private final Map<Long, Pedido> pedidos = new HashMap<>();
     private final MySqlBibliotecaRepository repositorio;
     private long nextId = 1L;
+    private int duracaoAluguelDias = Pedido.DURACAO_ALUGUEL_DIAS;
+    private List<String> formasPagamento = new ArrayList<>(
+            Arrays.asList("PIX", "CARTAO", "BOLETO"));
 
     public BibliotecaService() {
         this.repositorio = null;
@@ -67,6 +73,20 @@ public class BibliotecaService {
         return prestador;
     }
 
+    public void garantirAdministrador(String nome, String email, String senha) {
+        SenhaUtil.validarPolitica(senha);
+        if (repositorio != null) {
+            repositorio.garantirAdministrador(nome, email, senha);
+            return;
+        }
+        boolean existente = administradores.values().stream()
+                .anyMatch(administrador -> administrador.getEmail().equalsIgnoreCase(email));
+        if (!existente) {
+            Administrador administrador = new Administrador(nextId++, nome, email, senha, "Administração");
+            administradores.put(administrador.getId(), administrador);
+        }
+    }
+
     public Optional<Cliente> loginCliente(String email, String senha) {
         if (repositorio != null) {
             return repositorio.loginCliente(email, senha);
@@ -75,6 +95,83 @@ public class BibliotecaService {
                 .filter(cliente -> cliente.getEmail().equalsIgnoreCase(email)
                         && cliente.autenticar(senha))
                 .findFirst();
+    }
+
+    public Optional<Administrador> loginAdministrador(String email, String senha) {
+        if (repositorio != null) {
+            return repositorio.loginAdministrador(email, senha);
+        }
+        return administradores.values().stream()
+                .filter(administrador -> administrador.getEmail().equalsIgnoreCase(email)
+                        && administrador.autenticar(senha))
+                .findFirst();
+    }
+
+    public int getDuracaoAluguelDias() {
+        if (repositorio == null) {
+            return duracaoAluguelDias;
+        }
+        try {
+            return Integer.parseInt(repositorio.obterConfiguracao(
+                    "duracao_aluguel_dias", String.valueOf(Pedido.DURACAO_ALUGUEL_DIAS)));
+        } catch (NumberFormatException ex) {
+            throw new IllegalStateException("A duração de aluguel salva no sistema é inválida.", ex);
+        }
+    }
+
+    public List<String> getFormasPagamento() {
+        if (repositorio == null) {
+            return new ArrayList<>(formasPagamento);
+        }
+        String valor = repositorio.obterConfiguracao("formas_pagamento", "PIX,CARTAO,BOLETO");
+        List<String> configuradas = new ArrayList<>();
+        for (String forma : valor.split(",")) {
+            if (!forma.trim().isEmpty()) {
+                configuradas.add(forma.trim());
+            }
+        }
+        return configuradas;
+    }
+
+    public void atualizarConfiguracoes(int diasAluguel, List<String> metodosPagamento) {
+        if (diasAluguel < 1 || diasAluguel > 365) {
+            throw new IllegalArgumentException("O prazo do aluguel deve estar entre 1 e 365 dias.");
+        }
+        if (metodosPagamento == null || metodosPagamento.isEmpty()) {
+            throw new IllegalArgumentException("Mantenha ao menos uma forma de pagamento ativa.");
+        }
+        List<String> permitidas = Arrays.asList("PIX", "CARTAO", "BOLETO");
+        List<String> normalizadas = new ArrayList<>();
+        for (String metodo : metodosPagamento) {
+            if (metodo == null || !permitidas.contains(metodo.toUpperCase())) {
+                throw new IllegalArgumentException("Forma de pagamento inválida.");
+            }
+            String normalizado = metodo.toUpperCase();
+            if (normalizadas.contains(normalizado)) {
+                throw new IllegalArgumentException("Não repita formas de pagamento.");
+            }
+            normalizadas.add(normalizado);
+        }
+        if (repositorio != null) {
+            repositorio.salvarConfiguracoes(diasAluguel, String.join(",", normalizadas));
+        } else {
+            duracaoAluguelDias = diasAluguel;
+            formasPagamento = normalizadas;
+        }
+    }
+
+    public void atualizarEstoqueLivro(Long livroId, int quantidade, boolean disponivel) {
+        if (quantidade < 0) {
+            throw new IllegalArgumentException("A quantidade em estoque não pode ser negativa.");
+        }
+        if (repositorio != null) {
+            repositorio.atualizarEstoqueLivro(livroId, quantidade, disponivel);
+            return;
+        }
+        Livro livro = catalogo.buscarPorId(livroId)
+                .orElseThrow(() -> new IllegalArgumentException("Livro não encontrado."));
+        livro.setQuantidade(quantidade);
+        livro.setDisponivel(disponivel && quantidade > 0);
     }
 
     public Optional<PrestadorServico> loginPrestador(String email, String senha) {
@@ -175,7 +272,7 @@ public class BibliotecaService {
                 throw new IllegalStateException("Aluguel inválido.");
             }
             return repositorio.registrarPedido(cliente, livro, quantidade, pagamento,
-                    TipoPedido.ALUGUEL, StatusPedido.ATIVO);
+                    TipoPedido.ALUGUEL, StatusPedido.ATIVO, getDuracaoAluguelDias());
         }
         Livro livro = catalogo.buscarPorId(livroId)
                 .orElseThrow(() -> new IllegalArgumentException("Livro não encontrado."));
@@ -196,7 +293,8 @@ public class BibliotecaService {
             throw new IllegalStateException("Você já possui um aluguel ativo deste livro.");
         }
 
-        Pedido pedido = new Pedido(nextId++, cliente, TipoPedido.ALUGUEL, pagamento);
+        Pedido pedido = new Pedido(nextId++, cliente, TipoPedido.ALUGUEL, pagamento,
+                LocalDate.now(), StatusPedido.ATIVO, getDuracaoAluguelDias());
         pedido.adicionarItem(livro, quantidade);
         pedido.setStatus(StatusPedido.ATIVO);
         cliente.adicionarPedido(pedido);
