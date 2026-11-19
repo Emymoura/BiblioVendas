@@ -80,3 +80,9 @@ Aluguéis são exclusivos por cliente e livro enquanto ativos e usam o prazo con
 - `service` — regras de negócio
 - `database/schema.sql` — criação do banco, tabelas e catálogo de demonstração
 - `src/test/java` — testes de unidade e API HTTP
+
+
+## 📂 Navegação
+* 🔙 **[Voltar ao Início](../)**
+* ⚙️ **[Ir para a Documentação](../Documentação)**
+* 📄 **[Ir para o Front-End](../FrontEnd)**
