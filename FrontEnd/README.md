@@ -23,3 +23,8 @@ Abra `http://localhost:3000`. O Vite encaminha as chamadas `/api` para `http://1
 ```powershell
 npm run build
 ```
+
+## 📂 Navegação
+* 🔙 **[Voltar ao Início](../)**
+* ⚙️ **[Ir para o Back-End](../BackEnd)**
+* 📄 **[Ir para a documentação](../Documentação)**
